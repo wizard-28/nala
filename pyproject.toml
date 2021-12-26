@@ -1,0 +1,3 @@
+[tool.pylint.master]
+indent-string = "\t"
+
