@@ -10,7 +10,9 @@ INFO = 20
 DEBUG = 10
 
 # Define logging formatters
-formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s', datefmt='[%Y-%m-%d %H:%M:%S]')
+formatter = logging.Formatter(
+	"%(asctime)s %(levelname)s: %(message)s", datefmt="[%Y-%m-%d %H:%M:%S]"
+)
 sys_formatter = logging.Formatter('nala: %(levelname)s: %(message)s')
 nodate_format = logging.Formatter('[%(levelname)s]: %(message)s')
 empty_format = logging.Formatter('%(message)s')
