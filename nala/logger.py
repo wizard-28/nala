@@ -21,7 +21,8 @@ empty_format = logging.Formatter('%(message)s')
 logger = logging.getLogger('nala_logger')
 logger.setLevel(INFO)
 
-# Our syslogger. Currently only used for telling on people for using trying to use nala without permission
+# Our syslogger.
+# Currently only used for telling on people for using trying to use nala without permission
 syslogger = logging.getLogger('nala_syslogger')
 syslogger.setLevel(INFO)
 syslog_handler = SysLogHandler(facility=SysLogHandler.LOG_USER, address='/dev/log')
