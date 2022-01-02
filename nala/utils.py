@@ -74,7 +74,7 @@ SRCPKGCACHE = Path(apt_pkg.config.find_dir('Dir::Cache::srcpkgcache'))
 def dir_check(path: Path, err: str) -> None:
 	"""Check to see if the directory exists in apt config."""
 	if not path:
-		err = f'No archive dir is set. Usually it is /var/cache/apt/archives/'
+		err = 'No archive dir is set. Usually it is /var/cache/apt/archives/'
 		print(f'{style("Error:", **RED)} {err}')
 		sys.exit(1)
 
