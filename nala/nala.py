@@ -936,3 +936,6 @@ def apt_error(e):
 	print(f'{style("Error:", **RED)} {e}')
 	print('Are you root?')
 	exit(1)
+
+def clean():
+	archive = Path(apt_pkg.config.find_dir('Dir::Cache::Archives'))
