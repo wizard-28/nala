@@ -938,7 +938,7 @@ def apt_error(e):
 	exit(1)
 
 def clean(path: Path, verbose: bool = False) -> None:
-	"""iter the directory supplied and remove all files."""
+	"""Iter the directory supplied and remove all files."""
 	if verbose:
 		print(f'Removing files in {path}')
 	for file in path.iterdir():
