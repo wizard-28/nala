@@ -29,7 +29,8 @@ import apt_pkg
 from click import style
 from pyshell import pyshell
 
-# Leaving this here for now. I want to integrate this in fetch maybe. seems like a better way to get arch
+# TODO: I want to integrate this in fetch maybe.
+#       Seems like a better way to get arch.
 # apt_pkg.config.find_dir('APT::Architecture')
 
 # Click Style Colors
