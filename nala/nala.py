@@ -321,8 +321,7 @@ class nala:
 	def get_history(self, id):
 		dprint(f"Getting history {id}")
 		if not NALA_HISTORY.exists():
-			print("No history exists..")
-			exit()
+			sys.exit("No history exists..")
 		history = NALA_HISTORY.read_text().splitlines()
 		TRANSACTION = {}
 
