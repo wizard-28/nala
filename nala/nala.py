@@ -23,7 +23,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with nala.  If not, see <https://www.gnu.org/licenses/>.
-
+"""Main module for Nala which facilitates apt."""
 from __future__ import annotations
 
 import errno
@@ -38,7 +38,7 @@ from os import environ, get_terminal_size, getuid
 from pathlib import Path
 from subprocess import Popen
 from textwrap import TextWrapper
-from typing import NoReturn
+from typing import Any, NoReturn
 
 import apt_pkg
 import requests
@@ -57,11 +57,11 @@ timezone = datetime.utcnow().astimezone().tzinfo
 time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')+' '+str(timezone)
 
 try:
-	columns = get_terminal_size().columns
+	COLUMNS = get_terminal_size().columns
 except OSError:
-	columns = 80
+	COLUMNS = 80
 
-w_width = min(columns, 86)
+w_width = min(COLUMNS, 86)
 wrapper = TextWrapper(w_width, subsequent_indent='   ')
 
 try:
@@ -74,56 +74,30 @@ except KeyError:
 NALA_DIR = Path('/var/lib/nala')
 NALA_HISTORY = Path('/var/lib/nala/history')
 
-class nala:
+class Nala:
 
-	def __init__(self,  download_only = False,
-						assume_yes = False,
-						verbose = False,
-						debug = False,
-						no_update = False,
-						metalink_out = None,
-						hash_check = False,
-						raw_dpkg = False,
-						aria2c = '/usr/bin/aria2c'):
+	"""This is the main object for managing Nala operations."""
+	def __init__(self,	no_update = False,
+						hash_check = False):
 
-		# If self.raw_dpkg is enabled likely they want to see the update too.
+		# If raw_dpkg is enabled likely they want to see the update too.
 		# Turn off Rich scrolling if we don't have XTERM.
-		self.verbose = verbose
-		self.raw_dpkg = raw_dpkg
-		if self.raw_dpkg or 'xterm' not in os.environ["TERM"]:
-			self.verbose = True
+		if arguments.raw_dpkg or 'xterm' not in os.environ["TERM"]:
+			arguments.verbose = True
 
 		# We want to update the cache before we initialize it
 		if not no_update:
 			print('Updating package list...')
 			try:
-				Cache().update(UpdateProgress(verbose=verbose))
-			except (LockFailedException, FetchFailedException) as e:
-				apt_error(e)
-
-		# We check the arguments here to see if we have any kind of
-		# Non interactiveness going on
-		self.noninteractive = arguments.noninteractive
-		self.noninteractive_full = arguments.noninteractive_full
-		self.confold = arguments.confold
-		self.confnew = arguments.confnew
-		self.confdef = arguments.confdef
-		self.confmiss = arguments.confask
-		self.confask = arguments.confask
-		self.no_aptlist = arguments.no_aptlist
-
+				Cache().update(UpdateProgress(verbose=arguments.verbose))
+			except (LockFailedException, FetchFailedException) as err:
+				apt_error(err)
 		try:
-			self.cache = Cache(UpdateProgress(verbose=verbose))
-		except (LockFailedException, FetchFailedException) as e:
-			apt_error(e)
+			self.cache = Cache(UpdateProgress(verbose=arguments.verbose))
+		except (LockFailedException, FetchFailedException) as err:
+			apt_error(err)
 
-		self.download_only = download_only
-		self.debug = debug
-		self.assume_yes = assume_yes
-		self.metalink_out = metalink_out
 		self.hash_check = hash_check
-		self.aria2c = aria2c
-
 		# This is just a flag to check if we downloaded anything
 		self.downloaded = False
 		self.purge = False
@@ -139,11 +113,13 @@ class nala:
 		self.nala_depends = ['nala', 'python3-pyshell']
 
 	def upgrade(self, dist_upgrade=False):
+		"""Method for the (update, upgrade) command."""
 		self.cache.upgrade(dist_upgrade=dist_upgrade)
 		self.auto_remover()
 		self.get_changes(upgrade=True)
 
 	def glob_filter(self, pkg_names: list):
+		"""Filters provided packages and globs *."""
 		packages = self.cache.keys()
 		new_packages = []
 
@@ -160,6 +136,7 @@ class nala:
 		return new_packages
 
 	def install(self, pkg_names):
+		"""Method for the install command."""
 		dprint(f"Install pkg_names: {pkg_names}")
 		not_found = []
 
@@ -190,6 +167,7 @@ class nala:
 		self.get_changes()
 
 	def remove(self, pkg_names, purge=False):
+		"""Method for the (remove, purge) command."""
 		dprint(f"Remove pkg_names: {pkg_names}")
 		not_found = []
 		not_installed = []
@@ -222,6 +200,7 @@ class nala:
 		self.get_changes(remove=True)
 
 	def show(self, pkg_names):
+		"""Method for the show command."""
 		dprint(f"Show pkg_names: {pkg_names}")
 		print()
 		for pkg_name in pkg_names:
@@ -281,61 +260,13 @@ class nala:
 					f"{ERROR_PREFIX}{color(pkg_name, YELLOW)} not found"
 				)
 
-	def history(self):
-		if not NALA_HISTORY.exists():
-			print("No history exists..")
-			return
-		history = NALA_HISTORY.read_text().splitlines()
-		names = []
-
-		for transaction in history:
-			trans = []
-			transaction = json.loads(transaction)
-			trans.append(str(transaction.get('ID')))
-
-			command = transaction.get('Command')
-			if command[0] in ['update', 'upgrade']:
-				for package in transaction.get('Upgraded'):
-					command.append(package[0])
-
-			trans.append(' '.join(transaction.get('Command')))
-			trans.append(transaction.get('Date'))
-			trans.append(str(transaction.get('Altered')))
-			names.append(trans)
-
-		max_width = get_terminal_size().columns - 50
-		history_table = rich_table(
-					'ID:',
-					Column('Command:', no_wrap=True, max_width=max_width),
-					'Date and Time:',
-					'Altered:',
-					padding=(0,2), box=None
-				)
-
-		for item in names:
-			history_table.add_row(*item)
-
-		console.print(history_table)
-
-	def get_history(self, id):
-		dprint(f"Getting history {id}")
-		if not NALA_HISTORY.exists():
-			sys.exit("No history exists..")
-		history = NALA_HISTORY.read_text().splitlines()
-		TRANSACTION = {}
-
-		for transaction in history:
-			transaction = json.loads(transaction)
-			if transaction.get('ID') == id:
-				TRANSACTION = transaction
-		return TRANSACTION
-
-	def history_undo(self, id, redo: bool = False):
+	def history_undo(self, hist_id, redo: bool = False):
+		"""Method for the history undo/redo commands."""
 		if redo:
-			dprint(f"History: redo {id}")
+			dprint(f"History: redo {hist_id}")
 		else:
-			dprint(f"History: undo {id}")
-		transaction = self.get_history(id)
+			dprint(f"History: undo {hist_id}")
+		transaction = get_history(hist_id)
 
 		dprint(f"Transaction: {transaction}")
 
@@ -356,60 +287,8 @@ class nala:
 		else:
 			print('\nUndo for operations other than install or remove are not currently supported')
 
-	def history_clear(self, id):
-		dprint(f"History clear {id}")
-		if not NALA_HISTORY.exists():
-			print("No history exists to clear..")
-			return
-
-		if id == 'all':
-			NALA_HISTORY.unlink()
-			print("History has been cleared")
-			return
-
-		elif isinstance(id, int):
-			history = NALA_HISTORY.read_text().splitlines()
-			history_edit = []
-			sum = 0
-			# Using sum increments to relabled the IDs so when you remove just one
-			# There isn't a gap in ID numbers and it looks concurrent.
-			for transaction in history:
-				transaction = json.loads(transaction)
-				if transaction.get('ID') != id:
-					sum += 1
-					transaction['ID'] = sum
-					history_edit.append(json.dumps(transaction))
-			# Write the new history file
-			with open(NALA_HISTORY, 'w') as file:
-				for line in history_edit:
-					file.write(str(line)+'\n')
-		else:
-			print("\nYour option was not understood")
-
-	def history_info(self, id):
-		dprint(f"History info {id}")
-
-		transaction = self.get_history(id)
-
-		dprint(f"Transaction {transaction}")
-
-		delete_names = transaction.get('Removed')
-		install_names = transaction.get('Installed')
-		upgrade_names = transaction.get('Upgraded')
-
-		print_packages(['Package:', 'Version:', 'Size:'], delete_names, 'Removed:', 'bold red')
-		print_packages(['Package:', 'Version:', 'Size:'], install_names, 'Installed:', 'bold green')
-		print_packages(['Package:', 'Old Version:', 'New Version:', 'Size:'], upgrade_names, 'Upgraded:', 'bold blue')
-
-		print('='*columns)
-		if delete_names:
-			print(f'Removed {len(delete_names)} Packages')
-		if install_names:
-			print(f'Installed {len(install_names)} Packages')
-		if upgrade_names:
-			print(f'Upgraded {len(upgrade_names)} Packages')
-
 	def auto_remover(self):
+		"""Method for handling auto removal of packages."""
 		autoremove = []
 
 		for pkg in self.cache:
@@ -417,12 +296,15 @@ class nala:
 			if pkg.is_installed and pkg.is_auto_removable:
 				pkg.mark_delete(purge=self.purge)
 				autoremove.append(
-					f"<Package: '{pkg.name}' Arch: '{pkg.installed.architecture}' Version: '{pkg.installed.version}'"
+					f"<Package: '{pkg.name}' "
+					"Arch: '{pkg.installed.architecture}' "
+					"Version: '{pkg.installed.version}'"
 					)
 
 		dprint(f"Pkgs marked by autoremove: {autoremove}")
 
 	def check_essential(self, pkgs):
+		"""Method for checking removal of essential packages."""
 		for pkg in pkgs:
 			if pkg.is_installed:
 				# do not allow the removal of essential or required packages
@@ -438,6 +320,7 @@ class nala:
 			pkg_error(self.nala, 'cannot be removed', banter='auto_preservation', terminate=True)
 
 	def get_changes(self, upgrade=False, remove=False):
+		"""Get packages requiring changes and process them."""
 		pkgs = sorted(self.cache.get_changes(), key=lambda p:p.name)
 		if not NALA_DIR.exists():
 			NALA_DIR.mkdir()
@@ -455,7 +338,7 @@ class nala:
 			self.check_essential(pkgs)
 			delete_names, install_names, upgrade_names = sort_pkg_changes(pkgs)
 			self.print_update_summary(delete_names, install_names, upgrade_names)
-			if not self.assume_yes and not ask('Do you want to continue'):
+			if not arguments.assume_yes and not ask('Do you want to continue'):
 				print("Abort.")
 				return
 
@@ -465,52 +348,54 @@ class nala:
 			pkgs = [pkg for pkg in pkgs if not pkg.marked_delete and \
 						not self.file_downloaded(pkg, hash_check = \
 													  self.hash_check)]
-			if self.metalink_out:
-				with open(self.metalink_out, 'w', encoding='utf-8') as f:
-					make_metalink(f, pkgs)
-				return
+			# if self.metalink_out:
+			# 	with open(self.metalink_out, 'w', encoding='utf-8') as f:
+			# 		make_metalink(f, pkgs)
+			# 	return
 			if not self.download(pkgs, num_concurrent=guess_concurrent(pkgs)):
 				print("Some downloads failed. apt_pkg will take care of them.")
 
-		if self.download_only:
+		if arguments.download_only:
 			print("Download complete and in download only mode.")
 		else:
 			self.start_dpkg()
 
 	def start_dpkg(self):
+		"""Method for setting environment and starting dpkg."""
 		# Lets get our environment variables set before we get down to business
-		if self.noninteractive:
+		if arguments.noninteractive:
 			environ["DEBIAN_FRONTEND"] = "noninteractive"
-		if self.noninteractive_full:
+		if arguments.noninteractive_full:
 			environ["DEBIAN_FRONTEND"] = "noninteractive"
 			apt_pkg.config.set('Dpkg::Options::', '--force-confdef')
 			apt_pkg.config.set('Dpkg::Options::', '--force-confold')
-		if self.no_aptlist:
+		if arguments.no_aptlist:
 			environ["APT_LISTCHANGES_FRONTEND"] = "none"
-		if self.confdef:
+		if arguments.confdef:
 			apt_pkg.config.set('Dpkg::Options::', '--force-confdef')
-		if self.confold:
+		if arguments.confold:
 			apt_pkg.config.set('Dpkg::Options::', '--force-confold')
-		if self.confnew:
+		if arguments.confnew:
 			apt_pkg.config.set('Dpkg::Options::', '--force-confnew')
-		if self.confmiss:
+		if arguments.confmiss:
 			apt_pkg.config.set('Dpkg::Options::', '--force-confmiss')
-		if self.confask:
+		if arguments.confask:
 			apt_pkg.config.set('Dpkg::Options::', '--force-confask')
 
 		try:
 			self.cache.commit(
-				UpdateProgress(self.verbose, self.debug),
-				InstallProgress(self.verbose, self.debug, self.raw_dpkg)
+				UpdateProgress(arguments.verbose, arguments.debug),
+				InstallProgress(arguments.verbose, arguments.debug, arguments.raw_dpkg)
 			)
-		except apt_pkg.Error as e:
-			sys.exit(f'\r\n{ERROR_PREFIX+e}')
+		except apt_pkg.Error as err:
+			sys.exit(f'\r\n{ERROR_PREFIX+err}')
 
 	def download(self, pkgs, num_concurrent=2):
+		"""Method for beginning downloading of packages."""
 		if not pkgs:
 			return True
 		partial_dir = self.archive_dir / 'partial'
-		cmdline = [self.aria2c,
+		cmdline = ['/usr/bin/aria2c',
 				   '--metalink-file=-',
 				   '--file-allocation=none',
 				   '--auto-file-renaming=false',
@@ -544,13 +429,13 @@ class nala:
 		make_metalink(proc.stdin, pkgs)
 		proc.stdin.close()
 		# for verbose mode we just print aria2c output normally
-		if self.verbose or self.debug:
+		if arguments.verbose or arguments.debug:
 			for line in iter(proc.stdout.readline, ''):
 				# We don't really want this double printing if we have
 				# Verbose and debug enabled.
 				line = line.strip()
 				if line != '':
-					if self.debug:
+					if arguments.debug:
 						dprint(line)
 					else:
 						print(line)
@@ -576,13 +461,14 @@ class nala:
 				# partial directory to know download is complete
 				# in the next invocation.
 				src.rename(dst)
-			except OSError as e:
-				if e.errno != errno.ENOENT:
-					print("Failed to move archive file", e)
+			except OSError as err:
+				if err.errno != errno.ENOENT:
+					print("Failed to move archive file", err)
 				link_success = False
 		return proc.returncode == 0 and link_success
 
 	def file_downloaded(self, pkg, hash_check=False):
+		"""Checks if file has been downloaded and runs check hash."""
 		candidate = pkg.candidate
 		path = self.archive_dir / get_filename(candidate)
 		if not path.exists() or path.stat().st_size != candidate.size:
@@ -592,13 +478,13 @@ class nala:
 		hash_type, hash_value = get_hash(pkg.candidate)
 		try:
 			return check_hash(path, hash_type, hash_value)
-		except OSError as e:
-			if e.errno != errno.ENOENT:
-				print("Failed to check hash", e)
+		except OSError as err:
+			if err.errno != errno.ENOENT:
+				print("Failed to check hash", err)
 			return False
 
 	def print_update_summary(self, delete_names, install_names, upgrade_names):
-
+		"""Prints our transaction summary."""
 		delete = ('Purge', 'Purging:') if self.purge else ('Remove', 'Removing:')
 
 		print_packages(
@@ -632,9 +518,9 @@ class nala:
 		# I know this looks weird but it's how it has to be
 		width = len(str(max(width_list)))
 
-		print('='*columns)
+		print('='*COLUMNS)
 		print('Summary')
-		print('='*columns)
+		print('='*COLUMNS)
 		transaction_summary(install_names, width, 'Install')
 		transaction_summary(upgrade_names, width, 'Upgrade')
 		transaction_summary(delete_names, width, delete[0])
@@ -645,10 +531,10 @@ class nala:
 			# We need this extra line lol
 			print()
 		if self.cache.required_space < 0:
-			print(f'Disk space to free: {unit_str(-self.cache.required_space)}')
+			print(f'Disk space to free: {unit_str(-int(self.cache.required_space))}')
 		else:
 			print(f'Disk space required: {unit_str(self.cache.required_space)}')
-		if self.download_only:
+		if arguments.download_only:
 			print("Nala will only download the packages")
 
 def pkg_error(pkg_list: list, msg: str, banter: str = None, terminate: bool=False):
@@ -656,7 +542,6 @@ def pkg_error(pkg_list: list, msg: str, banter: str = None, terminate: bool=Fals
 	banter is optional and can be one of::
 
 		apt: "Maybe apt will let you"
-		self_preservation: "Why do you think I would destroy myself?"
 		auto_essential: "Whatever you did tried to auto mark essential packages"
 		auto_preservation: "Whatever you did would have resulted in my own removal!"
 	"""
@@ -677,31 +562,32 @@ def pkg_error(pkg_list: list, msg: str, banter: str = None, terminate: bool=Fals
 		sys.exit(1)
 
 def check_hash(path, hash_type, hash_value):
+	"""Check hash value."""
 	hash_fun = hashlib.new(hash_type)
-	with open(path) as f:
+	with open(path, encoding="utf-8") as file:
 		while 1:
-			bytes = f.read(4096)
-			if not bytes:
+			data = file.read(4096)
+			if not data:
 				break
-			hash_fun.update(bytes)
+			hash_fun.update(data)
 	return hash_fun.hexdigest() == hash_value
 
 def get_hash(version):
+	"""Get the correct hash value."""
 	if version.sha256:
 		return ("sha256", version.sha256)
-	elif version.sha1:
+	if version.sha1:
 		return ("sha1", version.sha1)
-	elif version.md5:
+	if version.md5:
 		return ("md5", version.md5)
-	else:
-		return (None, None)
+	return (None, None)
 
 def get_filename(version):
-	# TODO apt-get man page said filename and basename in URI
-	# could be different.
+	"""get filename of package."""
 	return Path(version.filename).name
 
 def make_metalink(out, pkgs):
+	"""Create metalink for aria2c."""
 	out.write('<?xml version="1.0" encoding="UTF-8"?>')
 	out.write('<metalink xmlns="urn:ietf:params:xml:ns:metalink">')
 	mirrors = []
@@ -730,6 +616,7 @@ def make_metalink(out, pkgs):
 	out.write('</metalink>')
 
 def guess_concurrent(pkgs):
+	"""Determine how many concurrent downloads to do."""
 	max_uris = 0
 	for pkg in pkgs:
 		version = pkg.candidate
@@ -764,7 +651,7 @@ def print_packages(headers: list[str], names: list[list], title, style=None):
 	for name in names:
 		package_table.add_row(*name)
 
-	sep = '='*columns
+	sep = '='*COLUMNS
 	console.print(
 		sep,
 		title,
@@ -772,6 +659,9 @@ def print_packages(headers: list[str], names: list[list], title, style=None):
 		package_table)
 
 def transaction_summary(names, width, header: str):
+	"""Prints a small transaction summary."""
+	# We should look at making this more readable
+	# Or integrating it somewhere else
 	if names:
 		print(
 			header.ljust(7),
@@ -780,12 +670,12 @@ def transaction_summary(names, width, header: str):
 			)
 
 def unit_str(val, just = 7):
+	"""Check integer and figure out what format it should be."""
 	if val > 1000**2:
 		return f"{val/1000/1000 :.1f}".rjust(just)+" MB"
-	elif val > 1000:
+	if val > 1000:
 		return f"{round(val/1000) :.0f}".rjust(just)+" kB"
-	else:
-		return f'{val :.0f}'.rjust(just)+" B"
+	return f'{val :.0f}'.rjust(just)+" B"
 
 def sort_pkg_changes(pkgs: list[Package]):
 	"""Sorts a list of packages and splits them based on the action to take."""
@@ -812,19 +702,20 @@ def sort_pkg_changes(pkgs: list[Package]):
 	return delete_names, install_names, upgrade_names
 
 def write_history(delete_names, install_names, upgrade_names):
+	"""Write our history to file"""
 	# We don't need only downloads in the history
 	if '--download-only' in sys.argv[1:]:
 		return
 
-	history = []
+	history_list = []
 	if NALA_HISTORY.exists():
-		history = NALA_HISTORY.read_text().splitlines()
+		history_list = NALA_HISTORY.read_text(encoding='utf-8').splitlines()
 
-	ID = len(history) + 1 if history else 1
+	hist_id = len(history_list) + 1 if history_list else 1
 	altered = len(delete_names) + len(install_names) + len(upgrade_names)
 
 	transaction = {
-		'ID' : ID,
+		'ID' : hist_id,
 		'Date' : time,
 		'Command' : sys.argv[1:],
 		'Altered' : altered,
@@ -833,13 +724,14 @@ def write_history(delete_names, install_names, upgrade_names):
 		'Upgraded' : upgrade_names,
 	}
 
-	history.append(json.dumps(transaction))
+	history_list.append(json.dumps(transaction))
 
-	with open(NALA_HISTORY, 'w') as file:
-		for line in history:
+	with open(NALA_HISTORY, 'w', encoding='utf-8') as file:
+		for line in history_list:
 			file.write(str(line)+'\n')
 
 def write_log(pkgs):
+	"""Write information to the log file."""
 	delete_names = []
 	install_names = []
 	upgrade_names = []
@@ -869,7 +761,7 @@ def write_log(pkgs):
 	logger_newline()
 
 def dep_format(package_dependecy):
-	"""Takes a dependency object like pkg.candidate.dependencies"""
+	"""Formats dependencies for show."""
 	for dep_list in package_dependecy:
 		dep_print = ''
 		for num, dep in enumerate(dep_list):
@@ -943,3 +835,114 @@ def iter_remove(path: Path, verbose: bool = False) -> None:
 		if file.is_file():
 			dprint(f'Removed: {file}')
 			file.unlink(missing_ok=True)
+
+def history():
+	"""Method for the history command."""
+	if not NALA_HISTORY.exists():
+		print("No history exists..")
+		return
+	history_file = NALA_HISTORY.read_text(encoding='utf-8').splitlines()
+	names = []
+
+	for transaction in history_file:
+		trans = []
+		transaction = json.loads(transaction)
+		trans.append(str(transaction.get('ID')))
+
+		command = transaction.get('Command')
+		if command[0] in ['update', 'upgrade']:
+			for package in transaction.get('Upgraded'):
+				command.append(package[0])
+
+		trans.append(' '.join(transaction.get('Command')))
+		trans.append(transaction.get('Date'))
+		trans.append(str(transaction.get('Altered')))
+		names.append(trans)
+
+	max_width = get_terminal_size().columns - 50
+	history_table = rich_table(
+				'ID:',
+				Column('Command:', no_wrap=True, max_width=max_width),
+				'Date and Time:',
+				'Altered:',
+				padding=(0,2), box=None
+			)
+
+	for item in names:
+		history_table.add_row(*item)
+
+	console.print(history_table)
+
+def history_info(hist_id):
+	"""Method for the history info command."""
+	dprint(f"History info {hist_id}")
+
+	transaction = get_history(hist_id)
+
+	dprint(f"Transaction {transaction}")
+
+	delete_names = transaction.get('Removed')
+	install_names = transaction.get('Installed')
+	upgrade_names = transaction.get('Upgraded')
+
+	print_packages(
+		['Package:', 'Version:', 'Size:'],
+		delete_names, 'Removed:', 'bold red')
+	print_packages(
+		['Package:', 'Version:', 'Size:'],
+		install_names, 'Installed:', 'bold green')
+	print_packages(
+		['Package:', 'Old Version:', 'New Version:', 'Size:'],
+		upgrade_names, 'Upgraded:', 'bold blue'
+	)
+
+	print('='*COLUMNS)
+	if delete_names:
+		print(f'Removed {len(delete_names)} Packages')
+	if install_names:
+		print(f'Installed {len(install_names)} Packages')
+	if upgrade_names:
+		print(f'Upgraded {len(upgrade_names)} Packages')
+
+def history_clear(hist_id: int | str) -> None:
+	"""Method for the show command."""
+	dprint(f"History clear {hist_id}")
+	if not NALA_HISTORY.exists():
+		print("No history exists to clear..")
+		return
+
+	if hist_id == 'all':
+		NALA_HISTORY.unlink()
+		print("History has been cleared")
+		return
+
+	if isinstance(hist_id, int):
+		history_file = NALA_HISTORY.read_text(encoding='utf-8').splitlines()
+		history_edit = []
+		num = 0
+		# Using sum increments to relabled the IDs so when you remove just one
+		# There isn't a gap in ID numbers and it looks concurrent.
+		for history_str in history_file:
+			transaction: dict[str, Any] = json.loads(history_str)
+			if transaction.get('ID') != hist_id:
+				num += 1
+				transaction['ID'] = num
+				history_edit.append(json.dumps(transaction))
+		# Write the new history file
+		with open(NALA_HISTORY, 'w', encoding='utf-8') as file:
+			for line in history_edit:
+				file.write(str(line)+'\n')
+	else:
+		print("\nYour option was not understood")
+
+def get_history(hist_id: int) -> dict[str, Any]:
+	"""Method for getting the history from file."""
+	dprint(f"Getting history {hist_id}")
+	if not NALA_HISTORY.exists():
+		sys.exit("No history exists..")
+	history_file = NALA_HISTORY.read_text(encoding='utf-8').splitlines()
+	for history_str in history_file:
+		transaction: dict[str, Any] = json.loads(history_str)
+		if transaction.get('ID') == hist_id:
+			return transaction
+	sys.exit(ERROR_PREFIX+f"Transaction {hist_id} doesn't exist.")

@@ -31,7 +31,7 @@ from typing import NoReturn
 
 from nala.fetch import fetch
 from nala.logger import dprint, esyslog
-from nala.nala import iter_remove, nala
+from nala.nala import iter_remove, history, history_info, history_clear, Nala
 from nala.options import arguments, parser
 from nala.utils import (CAT_ASCII, LION_ASCII, LION_ASCII2, ERROR_PREFIX,
 				ARCHIVE_DIR, LISTS_PARTIAL_DIR, PARTIAL_DIR, PKGCACHE, SRCPKGCACHE)
@@ -76,7 +76,7 @@ def apt_command(sudo: int) -> NoReturn:
 		apt.show(arguments.args)
 
 	elif arguments.command == 'history':
-		history(apt, sudo)
+		nala_history(apt, sudo)
 
 	elif not arguments.update:
 		sys.exit(ERROR_PREFIX+'unknown error in "apt_command" function')
@@ -114,7 +114,7 @@ def clean() -> None:
 	SRCPKGCACHE.unlink(missing_ok=True)
 	print("Cache has been cleaned")
 
-def history(apt: nala, sudo:int) -> None | NoReturn:
+def nala_history(apt: Nala, sudo:int) -> None | NoReturn:
 	"""Function for coordinating the history command."""
 	hist_id = arguments.id
 	mode = arguments.mode
@@ -128,7 +128,7 @@ def history(apt: nala, sudo:int) -> None | NoReturn:
 		except ValueError:
 			sys.exit(ERROR_PREFIX+'Option must be a number..')
 	else:
-		apt.history()
+		history()
 	if mode == 'undo':
 		apt.history_undo(hist_id)
 
@@ -136,11 +136,11 @@ def history(apt: nala, sudo:int) -> None | NoReturn:
 		apt.history_undo(hist_id, redo=True)
 
 	elif mode == 'info':
-		apt.history_info(hist_id)
+		history_info(hist_id)
 
 	elif mode == 'clear':
 		sudo_check(sudo, 'clear history')
-		apt.history_clear(hist_id)
+		history_clear(hist_id)
 
 def sudo_check(sudo: int, root_action: str) -> None | NoReturn:
 	"""Checks for root and exits if not root."""
@@ -148,7 +148,7 @@ def sudo_check(sudo: int, root_action: str) -> None | NoReturn:
 		esyslog(f'{getuser()} tried to run [{" ".join(sys.argv)}] without permission')
 		sys.exit(ERROR_PREFIX+f'Nala needs root to {root_action}')
 
-def init_apt() -> nala:
+def init_apt() -> Nala:
 	"""Initializes nala and determines if we update the cache or not."""
 	no_update_list = ('remove', 'show', 'history', 'install', 'purge')
 	no_update = arguments.no_update
@@ -157,14 +157,7 @@ def init_apt() -> nala:
 	if arguments.update:
 		no_update = False
 
-	return nala(
-		download_only=arguments.download_only,
-		assume_yes=arguments.assume_yes,
-		no_update=no_update,
-		debug=arguments.debug,
-		verbose=arguments.verbose,
-		raw_dpkg=arguments.raw_dpkg
-	)
+	return Nala(no_update)
 
 def moo_pls() -> None:
 	"""Pls moo."""

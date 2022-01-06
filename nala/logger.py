@@ -83,7 +83,7 @@ if arguments.debug:
 	logger.setLevel(DEBUG)
 
 def logger_newline() -> None:
-	"""Prints a blank newline in nala.log"""
+	"""Prints a blank newline in nala.log."""
 	file_handler.setFormatter(empty_format)
 	iprint('')
 	file_handler.setFormatter(formatter)
