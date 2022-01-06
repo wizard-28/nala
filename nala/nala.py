@@ -45,7 +45,7 @@ import requests
 from apt.cache import Cache, FetchFailedException, LockFailedException
 from apt.package import Package
 
-from nala.dpkg import InstallProgress, nalaProgress
+from nala.dpkg import InstallProgress, UpdateProgress
 from nala.logger import dprint, iprint, logger_newline
 from nala.options import arguments
 from nala.rich_custom import (Column, console, rich_grid,
@@ -97,7 +97,7 @@ class nala:
 		if not no_update:
 			print('Updating package list...')
 			try:
-				Cache().update(nalaProgress(verbose=verbose))
+				Cache().update(UpdateProgress(verbose=verbose))
 			except (LockFailedException, FetchFailedException) as e:
 				apt_error(e)
 
@@ -113,7 +113,7 @@ class nala:
 		self.no_aptlist = arguments.no_aptlist
 
 		try:
-			self.cache = Cache(nalaProgress(verbose=verbose))
+			self.cache = Cache(UpdateProgress(verbose=verbose))
 		except (LockFailedException, FetchFailedException) as e:
 			apt_error(e)
 
@@ -500,7 +500,7 @@ class nala:
 
 		try:
 			self.cache.commit(
-				nalaProgress(self.verbose, self.debug),
+				UpdateProgress(self.verbose, self.debug),
 				InstallProgress(self.verbose, self.debug, self.raw_dpkg)
 			)
 		except apt_pkg.Error as e:
