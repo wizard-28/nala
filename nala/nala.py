@@ -935,7 +935,7 @@ def apt_error(apt_err: FetchFailedException | LockFailedException) -> NoReturn:
 	print(ERROR_PREFIX+msg)
 	sys.exit('Are you root?')
 
-def clean(path: Path, verbose: bool = False) -> None:
+def iter_remove(path: Path, verbose: bool = False) -> None:
 	"""Iter the directory supplied and remove all files."""
 	if verbose:
 		print(f'Removing files in {path}')
