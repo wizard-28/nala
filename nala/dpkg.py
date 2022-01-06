@@ -36,13 +36,14 @@ import termios
 from pty import STDIN_FILENO, STDOUT_FILENO, fork
 from shutil import get_terminal_size
 from time import sleep
+from types import FrameType
+from typing import Callable, Optional, TextIO
 
 import apt_pkg
 from apt.progress import base
 from apt.progress import text
 from pexpect.fdpexpect import fdspawn
-from pexpect.utils import errno, poll_ignore_interrupts
-from ptyprocess.ptyprocess import _setwinsize
+from pexpect.utils import poll_ignore_interrupts
 
 from nala.rich_custom import rich_grid, rich_live, rich_spinner
 from nala.utils import (color, BLUE, RED, GREEN, YELLOW, ERROR_PREFIX,
@@ -68,17 +69,18 @@ LF = b'\n'
 
 # Attributes
 TERM_SIZE = get_terminal_size()
-TERM_MODE = tty.tcgetattr(STDIN_FILENO)
+TERM_MODE = termios.tcgetattr(STDIN_FILENO)
 
 spinner = rich_spinner('dots', text='Initializing', style="bold blue")
-scroll_list: list[spinner, str] = []
-notice = set()
+scroll_list: list[rich_spinner | str] = []
+notice: set[str] = set()
 live = rich_live(redirect_stdout=False)
 
 class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress):
 
 	"""Class for getting cache update status and printing to terminal."""
-	def __init__(self, verbose=False, debug=False):
+	def __init__(self, verbose: bool=False, debug: bool=False) -> None:
+		"""Class for getting cache update status and printing to terminal."""
 		text.TextProgress.__init__(self)
 		base.AcquireProgress.__init__(self)
 		base.OpProgress.__init__(self)
@@ -91,12 +93,12 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress):
 		if debug:
 			self.verbose=True
 
-		spinner.text = 'Initializing Cache'
+		spinner.update(text='Initializing Cache')
 		scroll_list.clear()
 		scroll_list.append(spinner)
 
 	# OpProgress Method
-	def update(self, percent=None):
+	def update(self, percent: Optional[float] = None) -> None:
 		"""Called periodically to update the user interface."""
 		base.OpProgress.update(self, percent)
 		if self.verbose:
@@ -106,7 +108,7 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress):
 			self.old_op = self.op
 
 	# OpProgress Method
-	def done(self, _dummy_variable=None):
+	def done(self, _dummy_variable:None = None) -> None: # type: ignore[override]
 		"""Called once an operation has been completed."""
 		base.OpProgress.done(self)
 		if self.verbose:
@@ -114,7 +116,7 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress):
 				self._write(f"\r{self.old_op}... Done", True, True)
 			self.old_op = ""
 
-	def _write(self, msg, newline=True, maximize=False):
+	def _write(self, msg: str, newline: bool = True, maximize: bool = False) -> None:
 		"""Write the message on the terminal, fill remaining space."""
 		if self.verbose:
 			self._file.write("\r")
@@ -138,22 +140,22 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress):
 				# For the pulse messages we need to do some formatting
 				# End of the line will look like '51.8 mB/s 2s'
 				if msg.endswith('s'):
-					msg = msg.split()
-					last = len(msg) - 1
-					fill = sum(len(line) for line in msg) + last
+					pulse = msg.split()
+					last = len(pulse) - 1
+					fill = sum(len(line) for line in pulse) + last
 					# Minus three too account for our spinner dots
 					fill = (self._width - fill) - 3
-					msg.insert(last-2, ' '*fill)
-					msg = ' '.join(msg)
+					pulse.insert(last-2, ' '*fill)
+					msg = ' '.join(pulse)
 
-				spinner.text = msg
+				spinner.update(text=msg)
 
-	def ims_hit(self, item):
+	def ims_hit(self, item: apt_pkg.AcquireItemDesc) -> None:
 		"""Called when an item is update (e.g. not modified on the server)."""
 		base.AcquireProgress.ims_hit(self, item)
 		self.write_update('No Change:', GREEN, item)
 
-	def fail(self, item):
+	def fail(self, item: apt_pkg.AcquireItemDesc) -> None:
 		"""Called when an item is failed."""
 		base.AcquireProgress.fail(self, item)
 		if item.owner.status == item.owner.STAT_DONE:
@@ -162,7 +164,7 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress):
 			self._write(ERROR_PREFIX+item.description)
 			self._write(f"  {item.owner.error_text}")
 
-	def fetch(self, item):
+	def fetch(self, item: apt_pkg.AcquireItemDesc) -> None:
 		"""Called when some of the item's data is fetched."""
 		base.AcquireProgress.fetch(self, item)
 		# It's complete already (e.g. Hit)
@@ -178,28 +180,28 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress):
 			line += f' [{size}B]'
 		self._write(line)
 
-	def _winch(self, _dummy=None, _dummy2=None) -> None:
+	def _winch(self, *_args: object) -> None:
 		"""Signal handler for window resize signals."""
 		if hasattr(self._file, "fileno") and os.isatty(self._file.fileno()):
 			buf = fcntl.ioctl(self._file, termios.TIOCGWINSZ, 8 * b' ')
 			dummy, col, dummy, dummy = struct.unpack('hhhh', buf)
 			self._width = col - 1  # 1 for the cursor
 
-	def start(self):
+	def start(self) -> None:
 		"""Start an Acquire progress.
 
 		In this case, the function sets up a signal handler for SIGWINCH, i.e.
 		window resize signals. And it also sets id to 1.
 		"""
 		base.AcquireProgress.start(self)
-		self._signal = signal.signal(signal.SIGWINCH, self._winch)
+		self._signal = signal.signal(signal.SIGWINCH, self._winch) # type: ignore[assignment]
 		# Get the window size.
 		self._width = 80
 		self._winch()
 		self._id = 1
 		live.start()
 
-	def stop(self):
+	def stop(self) -> None:
 		"""Invoked when the Acquire process stops running."""
 		base.AcquireProgress.stop(self)
 		# Trick for getting a translation from apt
@@ -219,16 +221,16 @@ class InstallProgress(base.InstallProgress):
 	def __init__(self,
 		verbose: bool = False,
 		debug: bool = False,
-		raw_dpkg: bool = False):
+		raw_dpkg: bool = False) -> None:
 		base.InstallProgress.__init__(self)
-
 		self.verbose = verbose
 		self.debug = debug
 		self.raw_dpkg = raw_dpkg
 		self.raw = False
-		self.last_line = None
-		self.dpkg_log = None
-		self.child = None
+		self.last_line = b''
+		self.dpkg_log: TextIO
+		self.child: AptExpect
+		self.child_fd: int
 
 		if self.raw_dpkg:
 			tty.setraw(STDIN_FILENO)
@@ -238,17 +240,17 @@ class InstallProgress(base.InstallProgress):
 		if 'xterm' not in os.environ["TERM"]:
 			os.environ["TERM"] = 'xterm'
 
-		spinner.text = 'Initializing dpkg'
+		spinner.update(text='Initializing dpkg')
 		scroll_list.clear()
 		scroll_list.append(spinner)
 
-	def start_update(self):
+	def start_update(self) -> None:
 		"""Start update."""
 		if not self.verbose and not self.raw_dpkg:
 			live.start()
-			spinner.text = color('Initializing dpkg...', BLUE)
+			spinner.update(text=color('Initializing dpkg...', BLUE))
 
-	def finish_update(self):
+	def finish_update(self) -> None:
 		"""Called when update has finished."""
 		if not self.verbose and not self.raw_dpkg:
 			live.stop()
@@ -258,20 +260,20 @@ class InstallProgress(base.InstallProgress):
 				print(notice_msg)
 		print(color("Finished Successfully", GREEN))
 
-	def __exit__(self, _type, value, traceback):
+	def __exit__(self, _type: object, value: object, traceback: object) -> None:
 		"""Exit."""
-		pass
 
-	def run(self, obj: apt_pkg.PackageManager):
+	def run(self, obj: apt_pkg.PackageManager | bytes | str) -> int:
 		"""
 		Install using the `PackageManager` object `obj`
 
 		returns the result of calling `obj.do_install()`
 		"""
-		pid, master_fd = fork()
+		pid, self.child_fd = fork()
 		if pid == 0:
 			try:
-				os._exit(obj.do_install())
+				# We ignore this with mypy because the attr is there
+				os._exit(obj.do_install()) # type: ignore[union-attr]
 			# We need to catch every exception here.
 			# If we don't the code continues in the child,
 			# And bugs will be very confusing
@@ -280,10 +282,10 @@ class InstallProgress(base.InstallProgress):
 				sys.stderr.write(f"{err}\n")
 				os._exit(1)
 
-		fcntl.fcntl(master_fd, fcntl.F_SETFL, os.O_NONBLOCK)
+		fcntl.fcntl(self.child_fd, fcntl.F_SETFL, os.O_NONBLOCK)
 		# We use fdspawn from pexpect to interact with out dpkg pty
 		# But we also subclass it to give it the interact method and setwindow
-		self.child = AptExpect(master_fd, timeout=None)
+		self.child = AptExpect(self.child_fd, timeout=None)
 
 		signal.signal(signal.SIGWINCH, self.sigwinch_passthrough)
 		with open(DPKG_LOG, 'w', encoding="utf-8") as self.dpkg_log:
@@ -294,19 +296,18 @@ class InstallProgress(base.InstallProgress):
 			finally:
 				# We need to make sure that no matter what the terminal
 				# Settings are restored if for some reason we stop
-				tty.tcsetattr(STDIN_FILENO, tty.TCSAFLUSH, TERM_MODE)
-
+				termios.tcsetattr(STDIN_FILENO, termios.TCSAFLUSH, TERM_MODE)
 		return 0
 
-	def sigwinch_passthrough(self, _sig, _data):
+	def sigwinch_passthrough(self, _sig_dummy: int, _data_dummy: Optional[FrameType]) -> None:
 		"""Pass through sigwinch signals to dpkg."""
 		buffer = struct.pack("HHHH", 0, 0, 0, 0)
 		term_size = struct.unpack('hhhh', fcntl.ioctl(STDOUT_FILENO,
 			termios.TIOCGWINSZ , buffer))
 		if not self.child.closed:
-			self.child.setwinsize(term_size[0],term_size[1])
+			setwinsize(self.child_fd, term_size[0],term_size[1])
 
-	def conf_check(self, rawline):
+	def conf_check(self, rawline: bytes) -> None:
 		"""Checks if we get a conf prompt"""
 		# I wish they would just use debconf for this.
 		# But here we are and this is what we're doing for config files
@@ -325,12 +326,12 @@ class InstallProgress(base.InstallProgress):
 				rawline = CR+rawline
 				break
 
-	def conf_end(self, rawline):
+	def conf_end(self, rawline: bytes) -> bool:
 		"""Checks to see if the conf prompt is over."""
 		return rawline == CR+LF and (CONF_MESSAGE[9] in self.last_line
 										or self.last_line in CONF_ANSWER)
 
-	def format_dpkg_output(self, rawline: bytes):
+	def format_dpkg_output(self, rawline: bytes) -> None:
 		"""Method that facilitates what needs to happen to dpkg output."""
 		# During early development this is mandatory
 		# if self.debug:
@@ -348,7 +349,7 @@ class InstallProgress(base.InstallProgress):
 				if self.verbose:
 					os.write(STDOUT_FILENO, rawline)
 				else:
-					spinner.text = color(rawline.decode().strip())
+					spinner.update(text=color(rawline.decode().strip()))
 					scroll_bar(msg=None)
 				return
 
@@ -366,7 +367,7 @@ class InstallProgress(base.InstallProgress):
 
 		self.line_handler(rawline)
 
-	def line_handler(self, rawline: bytes):
+	def line_handler(self, rawline: bytes) -> None:
 		"""Handles text operations if we're not using a rawline."""
 		line = rawline.decode().strip()
 		if line == '':
@@ -375,7 +376,7 @@ class InstallProgress(base.InstallProgress):
 		if check_line_spam(line, rawline):
 			return
 
-		spinner.text = color('Running dpkg...')
+		spinner.update(text=color('Running dpkg...'))
 		# Main format section for making things pretty
 		msg = msg_formatter(line)
 		# If verbose we just send it. No bars
@@ -387,24 +388,24 @@ class InstallProgress(base.InstallProgress):
 
 		self.set_last_line(rawline)
 
-	def rawline_handler(self, rawline):
+	def rawline_handler(self, rawline: bytes) -> None:
 		"""Handles text operations if we are using a rawline."""
 		os.write(STDOUT_FILENO, rawline)
 		# Once we write we can check if we need to pop out of raw mode
 		if RESTORE_TERM in rawline or self.conf_end(rawline):
 			self.raw = False
-			tty.tcsetattr(STDIN_FILENO, tty.TCSAFLUSH, TERM_MODE)
+			termios.tcsetattr(STDIN_FILENO, termios.TCSAFLUSH, TERM_MODE)
 			live.start()
 		self.set_last_line(rawline)
 
-	def set_last_line(self, rawline):
+	def set_last_line(self, rawline: bytes) -> None:
 		"""Sets the current line to last line if there is no backspace."""
 		# When at the conf prompt if you press Y, then backspace, then hit enter
 		# Things get really buggy so instead we check for a backspace
 		if BACKSPACE not in rawline:
 			self.last_line = rawline
 
-def check_line_spam(line, rawline):
+def check_line_spam(line: str, rawline: bytes) -> bool:
 	"""Checks for, and handles, notices and spam."""
 	for message in NOTICES:
 		if message in rawline:
@@ -413,7 +414,7 @@ def check_line_spam(line, rawline):
 
 	return any(item in line for item in SPAM)
 
-def raw_init():
+def raw_init() -> None:
 	"""Initialize raw terminal output."""
 	live.update('')
 	control_code(CURSER_UP+CLEAR_LINE)
@@ -423,8 +424,7 @@ def raw_init():
 def msg_formatter(line: str) -> str:
 	"""True formatter for dpkg output."""
 	msg = ''
-	line = line.split()
-	for word in line:
+	for word in line.split():
 		match = re.fullmatch(r'\(.*.\)', word)
 		if word == 'Removing':
 			msg += color('Removing:   ', RED)
@@ -447,7 +447,7 @@ def msg_formatter(line: str) -> str:
 			msg += ' ' + word
 	return msg
 
-def scroll_bar(msg: str) -> None:
+def scroll_bar(msg: str | None = None) -> None:
 	"""Prints msg to our scroll bar live display."""
 	if msg:
 		scroll_list.append(msg)
@@ -470,14 +470,28 @@ def scroll_bar(msg: str) -> None:
 
 	live.update(table)
 
-def control_code(code):
+def control_code(code: bytes) -> None:
 	"""Wrapper for sending escape codes"""
 	os.write(STDIN_FILENO, code)
 
-class AptExpect(fdspawn):
+def setwinsize(file_descriptor: int, rows: int, cols: int) -> None:
+	"""
+	Set the terminal window size of the child tty.
+
+	This will cause a SIGWINCH signal to be sent to the child. This does not
+	change the physical window size. It changes the size reported to
+	TTY-aware applications like vi or curses -- applications that respond to
+	the SIGWINCH signal.
+	"""
+	tiocswinz = getattr(termios, 'TIOCSWINSZ', -2146929561)
+	# Note, assume ws_xpixel and ws_ypixel are zero.
+	size = struct.pack('HHHH', rows, cols, 0, 0)
+	fcntl.ioctl(file_descriptor, tiocswinz, size)
+
+class AptExpect(fdspawn): # type: ignore[misc]
 
 	"""Subclass of fdspawn to add the interact method."""
-	def interact(self, output_filter):
+	def interact(self, output_filter: Callable[[bytes], None]) -> None:
 		"""
 		Hacked up interact method because pexpect doesn't want to have one
 		for fdspawn
@@ -494,25 +508,14 @@ class AptExpect(fdspawn):
 		self.stdout.flush()
 		self._buffer = self.buffer_type()
 
-		self.setwinsize(TERM_SIZE.lines, TERM_SIZE.columns)
+		setwinsize(self.child_fd, TERM_SIZE.lines, TERM_SIZE.columns)
 
 		try:
-			self.__interact_copy(output_filter)
+			self.interact_copy(output_filter)
 		finally:
-			tty.tcsetattr(STDIN_FILENO, tty.TCSAFLUSH, TERM_MODE)
+			termios.tcsetattr(STDIN_FILENO, termios.TCSAFLUSH, TERM_MODE)
 
-	def setwinsize(self, rows, cols):
-		"""
-		Set the terminal window size of the child tty.
-
-		This will cause a SIGWINCH signal to be sent to the child. This does not
-		change the physical window size. It changes the size reported to
-		TTY-aware applications like vi or curses -- applications that respond to
-		the SIGWINCH signal.
-		"""
-		return _setwinsize(self.child_fd, rows, cols)
-
-	def __interact_copy(self, output_filter):
+	def interact_copy(self, output_filter: Callable[[bytes], None]) -> None:
 		"""Used by the interact() method."""
 		while self.isalive():
 			try:
@@ -540,7 +543,7 @@ class AptExpect(fdspawn):
 				if live.is_started:
 					scroll_list.append(warn)
 					scroll_list.append(color("Ctrl+C twice quickly will exit...", RED))
-					scroll_bar(None)
+					scroll_bar()
 				else:
 					os.write(STDOUT_FILENO, LF+warn.encode())
 				sleep(0.5)
