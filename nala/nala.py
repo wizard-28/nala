@@ -38,7 +38,7 @@ from os import environ, get_terminal_size, getuid
 from pathlib import Path
 from subprocess import Popen
 from textwrap import TextWrapper
-from typing import Any, NoReturn
+from typing import Any, Iterable, NoReturn
 
 import apt_pkg
 import requests
@@ -625,7 +625,7 @@ def guess_concurrent(pkgs):
 		max_uris = 2
 	return max_uris
 
-def print_packages(headers: list[str], names: list[list], title, style=None):
+def print_packages(headers: list[str], names: list[list[str]], title, style=None):
 	"""Prints package transactions in a pretty format."""
 	if not names:
 		return
@@ -836,18 +836,50 @@ def iter_remove(path: Path, verbose: bool = False) -> None:
 			dprint(f'Removed: {file}')
 			file.unlink(missing_ok=True)
 
-def history():
+def get_key(
+	data: dict[str, int | str | list[str] | list[Any]],
+	key: str) -> int | str | list[str] | list[Any]:
+	"""Dict typing wrapper."""
+	return data.get(key, 0)
+
+def get_lists(data: dict[str, list[list[str]]], key: str) -> list[list[str]]:
+	"""Dict typing wrapper."""
+	# # Removed:, Installed and Upgraded:
+	# # A list of lists that looks like this
+	# [
+	# 	['caca-utils', '0.99.beta19-2.2', '    197 kB'],
+	# 	['chafa', '1.8.0-1', '     36 kB'],
+	# 	['jp2a', '1.1.1-1', '     33 kB'],
+	# 	['libchafa0', '1.8.0-1', '     78 kB'],
+	# 	['neofetch', '7.1.0-3', '     82 kB'],
+	# 	['toilet', '0.3-1.3', '     23 kB'],
+	# 	['toilet-fonts', '0.3-1.3', '    724 kB']
+	# ]
+	# # Upgraded has one more section for new versions
+	return data.get(key, [['None']])
+
+def history() -> None:
 	"""Method for the history command."""
-	if not NALA_HISTORY.exists():
+	if not NALA_HISTORY.exists():	# # A list of lists that looks like this
+	# [
+	# 	['caca-utils', '0.99.beta19-2.2', '    197 kB'],
+	# 	['chafa', '1.8.0-1', '     36 kB'],
+	# 	['jp2a', '1.1.1-1', '     33 kB'],
+	# 	['libchafa0', '1.8.0-1', '     78 kB'],
+	# 	['neofetch', '7.1.0-3', '     82 kB'],
+	# 	['toilet', '0.3-1.3', '     23 kB'],
+	# 	['toilet-fonts', '0.3-1.3', '    724 kB']
+	# ]
 		print("No history exists..")
 		return
 	history_file = NALA_HISTORY.read_text(encoding='utf-8').splitlines()
 	names = []
 
-	for transaction in history_file:
+	for history_str in history_file:
 		trans = []
-		transaction = json.loads(transaction)
-		trans.append(str(transaction.get('ID')))
+		transaction = json.loads(history_str)
+
+		trans.append(str(get_key(transaction, 'ID')))
 
 		command = transaction.get('Command')
 		if command[0] in ['update', 'upgrade']:
@@ -855,7 +887,7 @@ def history():
 				command.append(package[0])
 
 		trans.append(' '.join(transaction.get('Command')))
-		trans.append(transaction.get('Date'))
+		trans.append(str(transaction.get('Date')))
 		trans.append(str(transaction.get('Altered')))
 		names.append(trans)
 
@@ -873,7 +905,7 @@ def history():
 
 	console.print(history_table)
 
-def history_info(hist_id):
+def history_info(hist_id: int) -> None:
 	"""Method for the history info command."""
 	dprint(f"History info {hist_id}")
 
@@ -881,10 +913,10 @@ def history_info(hist_id):
 
 	dprint(f"Transaction {transaction}")
 
-	delete_names = transaction.get('Removed')
-	install_names = transaction.get('Installed')
-	upgrade_names = transaction.get('Upgraded')
-
+	delete_names = get_lists(transaction, 'Removed')
+	install_names = get_lists(transaction, 'Installed')
+	upgrade_names = get_lists(transaction, 'Upgraded')
+	print(delete_names)
 	print_packages(
 		['Package:', 'Version:', 'Size:'],
 		delete_names, 'Removed:', 'bold red')
