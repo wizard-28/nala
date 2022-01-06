@@ -30,14 +30,14 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
+from apt_pkg import get_architectures
 from aptsources.distro import get_distro
 from pythonping import ping
 
 from nala.logger import dprint
 from nala.options import arguments, parser
 from nala.rich_custom import fetch_progress, rich_grid, rich_live
-from nala.utils import (color, YELLOW, GREEN,
-				ERROR_PREFIX, NALA_SOURCES, ask, shell)
+from nala.utils import ask, color, YELLOW, GREEN, ERROR_PREFIX, NALA_SOURCES
 
 netselect_scored = []
 verbose = arguments.verbose
@@ -148,7 +148,7 @@ def parse_debian(country_list: list=None):
 	except requests.ConnectionError:
 		sys.exit(ERROR_PREFIX+'unable to connect to http://mirrors.ubuntu.com/mirrors.txt')
 
-	arches = get_arch()
+	arches = get_architectures()
 
 	# This is what one of our "Mirrors might look like after split"
 	# Site: mirrors.edge.kernel.org
@@ -199,15 +199,6 @@ def detect_release():
 
 	if distro and release:
 		return distro, release
-
-def get_arch() -> list[str]:
-	"""Query dpkg for supported architectures."""
-	arches = shell.dpkg.__print_architecture().stdout.strip().split()
-	foreign_arch = shell.dpkg.__print_foreign_architectures().stdout.strip().split()
-
-	if foreign_arch:
-		arches += foreign_arch
-	return arches
 
 def fetch(	fetches: int, foss: bool = False,
 			debian=None, ubuntu=None, country=None,
