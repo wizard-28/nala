@@ -21,7 +21,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with nala.  If not, see <https://www.gnu.org/licenses/>.
-
+"""Nala fetch Module."""
 from __future__ import annotations
 
 import re
@@ -33,6 +33,7 @@ import requests
 from apt_pkg import get_architectures
 from aptsources.distro import get_distro
 from pythonping import ping
+from rich.progress import TaskID
 
 from nala.logger import dprint
 from nala.options import arguments, parser
@@ -42,7 +43,7 @@ from nala.utils import ask, color, YELLOW, GREEN, ERROR_PREFIX, NALA_SOURCES
 netselect_scored = []
 verbose = arguments.verbose
 
-def net_select(mirror, task, live, total, num) -> None:
+def net_select(mirror: str, task: TaskID, live: rich_live, total: int, num: int) -> None:
 	"""Takes a URL and pings the domain and scores the latency."""
 	debugger = [f'Thread: {num}', f'Current Mirror: {mirror}']
 
@@ -81,14 +82,15 @@ def net_select(mirror, task, live, total, num) -> None:
 
 	except (socket.gaierror, OSError) as e:
 		if verbose:
-			e = str(e)
-			regex = re.search('\\[.*\\]', e)
+			err = str(e)
+			regex = re.search('\\[.*\\]', err)
 			if regex:
-				e = color(e.replace(regex.group(0), '').strip(), YELLOW)
-			print(f'{e}: {domain}')
+				err = color(err.replace(regex.group(0), '').strip(), YELLOW)
+			print(f'{err}: {domain}')
 			print(f'{color("URL:", YELLOW)} {mirror}\n')
 
-def parse_ubuntu(country_list: list=None):
+def parse_ubuntu(country_list: None | list[str] | set[str] = None) -> list[str]:
+	"""Gets and parses the Ubuntu mirror list."""
 	print('Fetching Ubuntu mirrors...')
 
 	try:
@@ -120,7 +122,8 @@ def parse_ubuntu(country_list: list=None):
 				if '<mirror:countrycode>' in line:
 					# <mirror:countrycode>US</mirror:countrycode>
 					result = re.search('<mirror:countrycode>(.*)</mirror:countrycode>', line)
-					country_list.add(result.group(1))
+					if result:
+						country_list.add(result.group(1))
 
 	if verbose:
 		print('Parsing mirror list...')
@@ -137,10 +140,12 @@ def parse_ubuntu(country_list: list=None):
 					if '<link>' in line:
 						# <link>http://mirror.steadfastnet.com/ubuntu/</link>
 						result = re.search('<link>(.*)</link>', line)
-						mirror_set.add(result.group(1))
+						if result:
+							mirror_set.add(result.group(1))
 	return list(mirror_set)
 
-def parse_debian(country_list: list=None):
+def parse_debian(country_list: None | list[str] | set[str] = None) -> list[str]:
+	"""Gets and parses the Debian mirror list."""
 	print('Fetching Debian mirrors...')
 
 	try:
@@ -179,15 +184,13 @@ def parse_debian(country_list: list=None):
 			if (country in mirror and 'Archive-http:' in mirror and all(arch in mirror for arch in arches)):
 				url = 'http://'
 				for line in mirror.splitlines():
-					if 'Site:' in line:
-						url += line.split()[1]
-					if 'Archive-http:' in line:
+					if 'Site:' in line or 'Archive-http:' in line:
 						url += line.split()[1]
 				mirror_set.add(url)
 	return list(mirror_set)
 
-def detect_release():
-
+def detect_release() -> tuple[None, None] | tuple[str, str]:
+	"""Detects the distro and release."""
 	lsb = get_distro()
 	try:
 		distro = lsb.id
@@ -199,11 +202,15 @@ def detect_release():
 
 	if distro and release:
 		return distro, release
+	else:
+		return None, None
 
 def fetch(	fetches: int, foss: bool = False,
-			debian=None, ubuntu=None, country=None,
-			assume_yes=False):
-	"""Fetches fast mirrors and write to nala-sources.list"""
+			debian: None | str = None,
+			ubuntu: None | str = None,
+			country: None | str = None,
+			assume_yes: bool = False) -> None:
+	"""Fetches fast mirrors and write to nala-sources.list."""
 	if (NALA_SOURCES.exists() and not assume_yes and
 	    not ask(f'{NALA_SOURCES.name} already exists.\ncontinue and overwrite it')
 	    ):
@@ -214,8 +221,7 @@ def fetch(	fetches: int, foss: bool = False,
 		sys.exit('Amount of fetches has to be 1-10...')
 
 	# If supplied a country it needs to be a list
-	if country:
-		country = [country]
+	country_list = [country] if country else None
 
 	if not debian and not ubuntu:
 		distro, release = detect_release()
@@ -227,10 +233,10 @@ def fetch(	fetches: int, foss: bool = False,
 		release = ubuntu
 
 	if distro == 'Debian':
-		netselect = parse_debian(country)
+		netselect = parse_debian(country_list)
 		component = 'main' if foss else 'main contrib non-free'
 	else:
-		netselect = parse_ubuntu(country)
+		netselect = parse_ubuntu(country_list)
 		# It's ubuntu, you probably don't care about foss
 		component = 'main restricted universe multiverse'
 
@@ -253,7 +259,7 @@ def fetch(	fetches: int, foss: bool = False,
 	dprint(f'Size of scored list: {len(netselect_scored)}')
 	dprint(f'Writing from: {netselect_scored[:fetches]}')
 
-	with open(NALA_SOURCES, 'w') as file:
+	with open(NALA_SOURCES, 'w', encoding="utf-8") as file:
 		print(f"{color('Writing:', GREEN)} {NALA_SOURCES}\n")
 		print('# Sources file built for nala\n', file=file)
 		fetches -= 1
