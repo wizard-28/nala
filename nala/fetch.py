@@ -27,6 +27,7 @@ from __future__ import annotations
 import re
 import socket
 import sys
+import itertools
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
@@ -41,7 +42,9 @@ from nala.rich_custom import fetch_progress, rich_grid, rich_live
 from nala.utils import ask, color, YELLOW, GREEN, ERROR_PREFIX, NALA_SOURCES
 
 netselect_scored = []
-verbose = arguments.verbose
+
+DEBIAN = 'Debian'
+UBUNTU = 'Ubuntu'
 
 def net_select(mirror: str, task: TaskID, live: rich_live, total: int, num: int) -> None:
 	"""Takes a URL and pings the domain and scores the latency."""
@@ -50,7 +53,7 @@ def net_select(mirror: str, task: TaskID, live: rich_live, total: int, num: int)
 	if not arguments.debug:
 		table = rich_grid()
 		table.add_row(f'{color("Mirror:", GREEN)} {num}/{total}')
-		table.add_row(fetch_progress)
+		table.add_row(fetch_progress.get_renderable())
 
 		fetch_progress.advance(task)
 		live.update(table)
@@ -63,13 +66,14 @@ def net_select(mirror: str, task: TaskID, live: rich_live, total: int, num: int)
 			return
 		domain = regex.group(1)
 		debugger.append(f'Pinged: {domain}')
+		# We convert the float to integer in order to get rid of the decimal
+		# From there we convert it to a string so we can prefix zeros for sorting
 		res = str(int(ping(domain, count=4, match=True, timeout=1).rtt_avg_ms))
-
 		debugger.append(f'Ping ms: {res}')
 		if len(res) == 2:
 			res = '0'+res
 		elif len(res) == 1:
-			res == '00'+res
+			res = '00'+res
 		elif len(res) > 3:
 			debugger.append('Mirror too slow')
 			dprint(debugger)
@@ -80,24 +84,19 @@ def net_select(mirror: str, task: TaskID, live: rich_live, total: int, num: int)
 		dprint(debugger)
 		netselect_scored.append(score)
 
-	except (socket.gaierror, OSError) as e:
-		if verbose:
-			err = str(e)
+	except (socket.gaierror, OSError) as ping_err:
+		if arguments.verbose:
+			err = str(ping_err)
 			regex = re.search('\\[.*\\]', err)
 			if regex:
 				err = color(err.replace(regex.group(0), '').strip(), YELLOW)
 			print(f'{err}: {domain}')
 			print(f'{color("URL:", YELLOW)} {mirror}\n')
 
-def parse_ubuntu(country_list: None | list[str] | set[str] = None) -> list[str]:
+def ubuntu_mirror(country_list: tuple[str, ...] | None) -> tuple[str, ...]:
 	"""Gets and parses the Ubuntu mirror list."""
 	print('Fetching Ubuntu mirrors...')
-
-	try:
-		ubuntu = requests.get("https://launchpad.net/ubuntu/+archivemirrors-rss").text.split('<item>')
-	except requests.ConnectionError:
-		sys.exit(ERROR_PREFIX+'unable to connect to http://mirrors.ubuntu.com/mirrors.txt')
-
+	ubuntu = fetch_mirrors("https://launchpad.net/ubuntu/+archivemirrors-rss", '<item>')
 	# This is what one of our "Mirrors might look like after split"
 	#      <title>Steadfast Networks</title>
 	#      <link>http://mirror.steadfastnet.com/ubuntu/</link>
@@ -112,49 +111,13 @@ def parse_ubuntu(country_list: None | list[str] | set[str] = None) -> list[str]:
 	#      <pubDate>Fri, 24 Dec 2021 05:26:30 -0000</pubDate>
 	#      <guid>http://mirror.steadfastnet.com/ubuntu/</guid>
 	#    </item>
+	return parse_mirror(UBUNTU, ubuntu, country_list)
 
-	# No country has been supplied so we should get all the countries possible
-	if country_list is None:
-		country_list = set()
-		# The way we split the information we get nice and pretty mirror selections
-		for mirror in ubuntu:
-			for line in mirror.splitlines():
-				if '<mirror:countrycode>' in line:
-					# <mirror:countrycode>US</mirror:countrycode>
-					result = re.search('<mirror:countrycode>(.*)</mirror:countrycode>', line)
-					if result:
-						country_list.add(result.group(1))
-
-	if verbose:
-		print('Parsing mirror list...')
-	mirror_set = set()
-	# If no country is supplied then our list will be all countries
-	for country in country_list:
-		for mirror in ubuntu:
-			# First section we get from here is garbage. Let's ditch it and get to business
-			if '<title>Ubuntu Archive Mirrors Status</title>' in mirror:
-				continue
-			# This is where the real magic is happening.
-			if country in mirror:
-				for line in mirror.splitlines():
-					if '<link>' in line:
-						# <link>http://mirror.steadfastnet.com/ubuntu/</link>
-						result = re.search('<link>(.*)</link>', line)
-						if result:
-							mirror_set.add(result.group(1))
-	return list(mirror_set)
-
-def parse_debian(country_list: None | list[str] | set[str] = None) -> list[str]:
+def debian_mirror(country_list: tuple[str, ...] | None) -> tuple[str, ...]:
 	"""Gets and parses the Debian mirror list."""
 	print('Fetching Debian mirrors...')
-
-	try:
-		debian = requests.get("https://mirror-master.debian.org/status/Mirrors.masterlist").text.split('\n\n')
-	except requests.ConnectionError:
-		sys.exit(ERROR_PREFIX+'unable to connect to http://mirrors.ubuntu.com/mirrors.txt')
-
-	arches = get_architectures()
-
+	debian = fetch_mirrors("https://mirror-master.debian.org/status/Mirrors.masterlist", '\n\n')
+	arches = tuple(get_architectures())
 	# This is what one of our "Mirrors might look like after split"
 	# Site: mirrors.edge.kernel.org
 	# Country: NL Netherlands
@@ -165,78 +128,129 @@ def parse_debian(country_list: None | list[str] | set[str] = None) -> list[str]:
 	# Archive-architecture: amd64 arm64 armel armhf i386 mips mips64el mipsel powerpc ppc64el s390x
 	# Archive-http: /debian/
 	# Sponsor: packet.net https://packet.net/
+	return parse_mirror(DEBIAN, debian, country_list, arches)
 
-	# No country has been supplied so we should get all the countries possible
-	if country_list is None:
-		country_list = set()
-		# The way we split the information we get nice and pretty mirror selections
-		for mirror in debian:
-			for line in mirror.splitlines():
-				if 'Country:' in line:
-					# Country: SE Sweden
-					country_list.add(line.split()[1])
-	if verbose:
-		print('Parsing mirror list...')
-	mirror_set = set()
-	# If no country is supplied then our list will be all countries
-	for country in country_list:
-		for mirror in debian:
-			if (country in mirror and 'Archive-http:' in mirror and all(arch in mirror for arch in arches)):
-				url = 'http://'
-				for line in mirror.splitlines():
-					if 'Site:' in line or 'Archive-http:' in line:
-						url += line.split()[1]
-				mirror_set.add(url)
-	return list(mirror_set)
-
-def detect_release() -> tuple[None, None] | tuple[str, str]:
-	"""Detects the distro and release."""
-	lsb = get_distro()
+def fetch_mirrors(url: str, splitter: str) -> tuple[str, ...]:
+	"""Attempts to fetch the url and split a list based on the splitter."""
 	try:
+		mirror_list = requests.get(url).text.split(splitter)
+	except requests.ConnectionError:
+		sys.exit(ERROR_PREFIX+f'unable to connect to {url}')
+	return tuple(mirror_list)
+
+def parse_mirror(
+		distro: str, master_mirror: tuple[str, ...],
+		country_list: tuple[str, ...] | None,
+		arches: tuple[str, ...] | tuple[()] = ()
+	) -> tuple[str, ...]:
+	"""Parses the mirrors."""
+	mirror_set = set()
+	if arguments.verbose:
+		print('Parsing mirror list...')
+	# If no country is supplied then our list will be all countries
+	countries = country_list or get_countries(master_mirror)
+	for country, mirror in itertools.product(countries, master_mirror):
+		if country not in mirror:
+			continue
+		if distro == DEBIAN:
+			url = debian_parser(mirror, arches)
+		elif distro == UBUNTU:
+			url = ubuntu_parser(mirror)
+
+		if url:
+			mirror_set.add(url)
+	return tuple(mirror_set)
+
+def get_countries(master_mirror: tuple[str, ...]) -> tuple[str, ...]:
+	"""Iterates the mirror list and returns a set of all valid countries."""
+	country_list = set()
+	# The way we split the information we get nice and pretty mirror selections
+	for mirror in master_mirror:
+		for line in mirror.splitlines():
+			# Debian Countries
+			if 'Country:' in line:
+				# Country: SE Sweden
+				country_list.add(line.split()[1])
+			# Ubuntu Countries
+			elif '<mirror:countrycode>' in line:
+				# <mirror:countrycode>US</mirror:countrycode>
+				result = re.search('<mirror:countrycode>(.*)</mirror:countrycode>', line)
+				if result:
+					country_list.add(result.group(1))
+	return tuple(country_list)
+
+def debian_parser(mirror: str, arches: tuple[str, ...] | tuple[()]) -> str | None:
+	"""Parses the Debian mirror."""
+	url = 'http://'
+	if 'Archive-http:' in mirror and all(arch in mirror for arch in arches):
+		for line in mirror.splitlines():
+			if line.startswith(('Archive-http:', 'Site:')):
+				#['Site:', 'mirror.steadfastnet.com']
+				#['Archive-http:', '/debian/']
+				url += line.split()[1]
+	if url == 'http://':
+		return None
+	return url
+
+def ubuntu_parser(mirror: str) -> str | None:
+	"""Parses the Ubuntu mirror."""
+	# First section we get from Ubuntu is garbage. Let's ditch it and get to business
+	if '<title>Ubuntu Archive Mirrors Status</title>' in mirror:
+		return None
+
+	for line in mirror.splitlines():
+		if '<link>' in line:
+			# <link>http://mirror.steadfastnet.com/ubuntu/</link>
+			result = re.search('<link>(.*)</link>', line)
+			if result:
+				return result.group(1)
+	return None
+
+def detect_release() -> tuple[str | None, ...]:
+	"""Detects the distro and release."""
+	try:
+		lsb = get_distro()
 		distro = lsb.id
 		release = lsb.codename
-	except:
+	# I'm not sure if this can fail but if it does we can't really continue.
+	except Exception as err: # pylint: disable=broad-except
+		print(err)
 		print(ERROR_PREFIX+'Unable to detect release. Specify manually')
 		parser.parse_args(['fetch', '--help'])
 		sys.exit(1)
 
 	if distro and release:
 		return distro, release
-	else:
-		return None, None
+	return None, None
 
-def fetch(	fetches: int, foss: bool = False,
-			debian: None | str = None,
-			ubuntu: None | str = None,
-			country: None | str = None,
-			assume_yes: bool = False) -> None:
+def fetch() -> None:
 	"""Fetches fast mirrors and write to nala-sources.list."""
-	if (NALA_SOURCES.exists() and not assume_yes and
+	if (NALA_SOURCES.exists() and not arguments.assume_yes and
 	    not ask(f'{NALA_SOURCES.name} already exists.\ncontinue and overwrite it')
 	    ):
 		sys.exit('Abort')
 
 	# Make sure there aren't any shenanigans
-	if fetches not in range(1,11):
+	if arguments.fetches not in range(1,11):
 		sys.exit('Amount of fetches has to be 1-10...')
 
 	# If supplied a country it needs to be a list
-	country_list = [country] if country else None
+	country_list = (arguments.country,) if arguments.country else None
 
-	if not debian and not ubuntu:
+	if not arguments.debian and not arguments.ubuntu:
 		distro, release = detect_release()
-	elif debian:
-		distro = 'Debian'
-		release = debian
+	elif arguments.debian:
+		distro = DEBIAN
+		release = arguments.debian
 	else:
-		distro = 'Ubuntu'
-		release = ubuntu
+		distro = UBUNTU
+		release = arguments.ubuntu
 
-	if distro == 'Debian':
-		netselect = parse_debian(country_list)
-		component = 'main' if foss else 'main contrib non-free'
+	if distro == DEBIAN:
+		netselect = debian_mirror(country_list)
+		component = 'main' if arguments.foss else 'main contrib non-free'
 	else:
-		netselect = parse_ubuntu(country_list)
+		netselect = ubuntu_mirror(country_list)
 		# It's ubuntu, you probably don't care about foss
 		component = 'main restricted universe multiverse'
 
@@ -257,12 +271,12 @@ def fetch(	fetches: int, foss: bool = False,
 	dprint(netselect_scored)
 	dprint(f'Size of original list: {len(netselect)}')
 	dprint(f'Size of scored list: {len(netselect_scored)}')
-	dprint(f'Writing from: {netselect_scored[:fetches]}')
+	dprint(f'Writing from: {netselect_scored[:arguments.fetches]}')
 
 	with open(NALA_SOURCES, 'w', encoding="utf-8") as file:
 		print(f"{color('Writing:', GREEN)} {NALA_SOURCES}\n")
 		print('# Sources file built for nala\n', file=file)
-		fetches -= 1
+		arguments.fetches -= 1
 		for num, line in enumerate(netselect_scored):
 			# This splits off the score '030 http://mirror.steadfast.net/debian/'
 			line = line[line.index('h'):]
@@ -270,5 +284,5 @@ def fetch(	fetches: int, foss: bool = False,
 			print(f'deb-src {line} {release} {component}\n')
 			print(f'deb {line} {release} {component}', file=file)
 			print(f'deb-src {line} {release} {component}\n', file=file)
-			if num == fetches:
+			if num == arguments.fetches:
 				break

@@ -86,14 +86,8 @@ def not_apt_command() -> NoReturn:
 	"""Commands that do not require initializing the apt cache."""
 	if arguments.command == 'clean':
 		clean()
-
 	elif arguments.command == 'fetch':
-		fetch(
-			arguments.fetches, arguments.foss,
-			arguments.debian, arguments.ubuntu,
-			arguments.country, arguments.assume_yes
-		)
-
+		fetch()
 	elif arguments.command == 'moo':
 		moo_pls()
 	else:
