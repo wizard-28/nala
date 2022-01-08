@@ -31,10 +31,12 @@ from typing import NoReturn
 
 from nala.fetch import fetch
 from nala.logger import dprint, esyslog
-from nala.nala import iter_remove, nala
+from nala.nala import Nala
+from nala.history import history, history_info, history_clear, history_undo
 from nala.options import arguments, parser
-from nala.utils import (CAT_ASCII, LION_ASCII, LION_ASCII2, ERROR_PREFIX,
-				ARCHIVE_DIR, LISTS_PARTIAL_DIR, PARTIAL_DIR, PKGCACHE, SRCPKGCACHE)
+from nala.utils import iter_remove, dir_check
+from nala.constants import (CAT_ASCII, ERROR_PREFIX, ARCHIVE_DIR,
+				LISTS_DIR, PKGCACHE, SRCPKGCACHE, PARTIAL_DIR, LISTS_PARTIAL_DIR)
 
 
 def _main() -> NoReturn:
@@ -42,6 +44,12 @@ def _main() -> NoReturn:
 	if not arguments.command and not arguments.update:
 		parser.print_help()
 		sys.exit(1)
+
+	# Make sure these are set, they probably are, but we will error early if not
+	dir_check(ARCHIVE_DIR, 'No archive dir is set. Usually it is /var/cache/apt/archives/')
+	dir_check(LISTS_DIR, 'No lists dir is set. Usually it is /var/lib/apt/lists/')
+	dir_check(PKGCACHE, 'No pkgcache file is set. Usually it is /var/cache/apt/pkgcache.bin')
+	dir_check(SRCPKGCACHE, 'No srcpkgcache file is set. Usually it is /var/cache/apt/srcpkgcache.bin')
 
 	dprint(f"Argparser = {arguments}")
 	superuser= ('update', 'upgrade', 'install', 'remove', 'fetch', 'clean')
@@ -76,7 +84,7 @@ def apt_command(sudo: int) -> NoReturn:
 		apt.show(arguments.args)
 
 	elif arguments.command == 'history':
-		history(apt, sudo)
+		nala_history(apt, sudo)
 
 	elif not arguments.update:
 		sys.exit(ERROR_PREFIX+'unknown error in "apt_command" function')
@@ -114,33 +122,32 @@ def clean() -> None:
 	SRCPKGCACHE.unlink(missing_ok=True)
 	print("Cache has been cleaned")
 
-def history(apt: nala, sudo:int) -> None | NoReturn:
+def nala_history(apt: Nala, sudo:int) -> None | NoReturn:
 	"""Function for coordinating the history command."""
-	hist_id = arguments.id
 	mode = arguments.mode
-
-	if mode and not hist_id:
+	if mode and not arguments.id:
 		sys.exit(ERROR_PREFIX+'We need a transaction ID..')
 
 	if mode in ('undo', 'redo', 'info'):
 		try:
-			hist_id = int(hist_id)
-		except ValueError:
+			# We are basically just type checking here
+			int(arguments.id)
+		except ValueError as e:
 			sys.exit(ERROR_PREFIX+'Option must be a number..')
-	else:
-		apt.history()
+	if not mode:
+		history()
 	if mode == 'undo':
-		apt.history_undo(hist_id)
+		history_undo(apt, arguments.id)
 
 	elif mode == 'redo':
-		apt.history_undo(hist_id, redo=True)
+		history_undo(apt, arguments.id, redo=True)
 
 	elif mode == 'info':
-		apt.history_info(hist_id)
+		history_info(arguments.id)
 
 	elif mode == 'clear':
 		sudo_check(sudo, 'clear history')
-		apt.history_clear(hist_id)
+		history_clear(arguments.id)
 
 def sudo_check(sudo: int, root_action: str) -> None | NoReturn:
 	"""Checks for root and exits if not root."""
@@ -148,7 +155,7 @@ def sudo_check(sudo: int, root_action: str) -> None | NoReturn:
 		esyslog(f'{getuser()} tried to run [{" ".join(sys.argv)}] without permission')
 		sys.exit(ERROR_PREFIX+f'Nala needs root to {root_action}')
 
-def init_apt() -> nala:
+def init_apt() -> Nala:
 	"""Initializes nala and determines if we update the cache or not."""
 	no_update_list = ('remove', 'show', 'history', 'install', 'purge')
 	no_update = arguments.no_update
@@ -157,14 +164,7 @@ def init_apt() -> nala:
 	if arguments.update:
 		no_update = False
 
-	return nala(
-		download_only=arguments.download_only,
-		assume_yes=arguments.assume_yes,
-		no_update=no_update,
-		debug=arguments.debug,
-		verbose=arguments.verbose,
-		raw_dpkg=arguments.raw_dpkg
-	)
+	return Nala(no_update)
 
 def moo_pls() -> None:
 	"""Pls moo."""
@@ -172,11 +172,11 @@ def moo_pls() -> None:
 	moos = moos.count('moo')
 	dprint(f"moo number is {moos}")
 	if moos == 1:
-		print(LION_ASCII)
+		print(CAT_ASCII['2'])
 	elif moos == 2:
-		print(LION_ASCII2)
+		print(CAT_ASCII['3'])
 	else:
-		print(CAT_ASCII)
+		print(CAT_ASCII['1'])
 	print('..."I can\'t moo for I\'m a cat"...')
 	if arguments.no_update:
 		print("...What did you expect no-update to do?...")

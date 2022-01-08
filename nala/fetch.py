@@ -38,21 +38,22 @@ from rich.progress import TaskID
 
 from nala.logger import dprint
 from nala.options import arguments, parser
-from nala.rich_custom import fetch_progress, rich_grid, rich_live
-from nala.utils import ask, color, YELLOW, GREEN, ERROR_PREFIX, NALA_SOURCES
+from nala.rich import fetch_progress, Table, Live
+from nala.constants import NALA_SOURCES, ERROR_PREFIX
+from nala.utils import ask, color
 
 netselect_scored = []
 
 DEBIAN = 'Debian'
 UBUNTU = 'Ubuntu'
 
-def net_select(mirror: str, task: TaskID, live: rich_live, total: int, num: int) -> None:
+def net_select(mirror: str, task: TaskID, live: Live, total: int, num: int) -> None:
 	"""Takes a URL and pings the domain and scores the latency."""
 	debugger = [f'Thread: {num}', f'Current Mirror: {mirror}']
 
 	if not arguments.debug:
-		table = rich_grid()
-		table.add_row(f'{color("Mirror:", GREEN)} {num}/{total}')
+		table = Table.grid()
+		table.add_row(f"{color('Mirror:', 'GREEN')} {num}/{total}")
 		table.add_row(fetch_progress.get_renderable())
 
 		fetch_progress.advance(task)
@@ -89,9 +90,9 @@ def net_select(mirror: str, task: TaskID, live: rich_live, total: int, num: int)
 			err = str(ping_err)
 			regex = re.search('\\[.*\\]', err)
 			if regex:
-				err = color(err.replace(regex.group(0), '').strip(), YELLOW)
+				err = color(err.replace(regex.group(0), '').strip(), 'YELLOW')
 			print(f'{err}: {domain}')
-			print(f'{color("URL:", YELLOW)} {mirror}\n')
+			print(f"{color('URL:', 'YELLOW')} {mirror}\n")
 
 def ubuntu_mirror(country_list: tuple[str, ...] | None) -> tuple[str, ...]:
 	"""Gets and parses the Ubuntu mirror list."""
@@ -258,7 +259,7 @@ def fetch() -> None:
 	dprint(f'Distro: {distro}, Release: {release}, Component: {component}')
 
 	print('Testing mirrors...')
-	with rich_live(transient=True) as live:
+	with Live(transient=True) as live:
 		with ThreadPoolExecutor(max_workers=32) as pool:
 			total = len(netselect)
 			task = fetch_progress.add_task('', total=total)
@@ -274,7 +275,7 @@ def fetch() -> None:
 	dprint(f'Writing from: {netselect_scored[:arguments.fetches]}')
 
 	with open(NALA_SOURCES, 'w', encoding="utf-8") as file:
-		print(f"{color('Writing:', GREEN)} {NALA_SOURCES}\n")
+		print(f"{color('Writing:', 'GREEN')} {NALA_SOURCES}\n")
 		print('# Sources file built for nala\n', file=file)
 		arguments.fetches -= 1
 		for num, line in enumerate(netselect_scored):

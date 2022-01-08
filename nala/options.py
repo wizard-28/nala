@@ -30,7 +30,7 @@ from pathlib import Path
 from pydoc import pager
 
 from nala import __version__
-from nala.utils import LICENSE
+from nala.constants import LICENSE
 
 
 # Custom Parser for printing help on error.

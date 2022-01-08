@@ -34,20 +34,18 @@ import tty
 import struct
 import termios
 from pty import STDIN_FILENO, STDOUT_FILENO, fork
-from shutil import get_terminal_size
 from time import sleep
 from types import FrameType
-from typing import Callable, Optional, TextIO
+from typing import Callable, TextIO
 
 import apt_pkg
-from apt.progress import base
-from apt.progress import text
+from apt.progress import base, text
 from pexpect.fdpexpect import fdspawn
 from pexpect.utils import poll_ignore_interrupts
 
-from nala.rich_custom import rich_grid, rich_live, rich_spinner
-from nala.utils import (color, BLUE, RED, GREEN, YELLOW, ERROR_PREFIX,
-				CONF_ANSWER, CONF_MESSAGE, DPKG_LOG, DPKG_STATUS, NOTICES, SPAM)
+from nala.rich import Table, Live, Spinner
+from nala.constants import DPKG_LOG, TERM_SIZE, DPKG_MSG, ERROR_PREFIX
+from nala.utils import color
 
 # Control Codes
 CURSER_UP = b'\x1b[1A'
@@ -67,14 +65,12 @@ NORMAL_KEYPAD = b'\x1b>'
 CR = b'\r'
 LF = b'\n'
 
-# Attributes
-TERM_SIZE = get_terminal_size()
 TERM_MODE = termios.tcgetattr(STDIN_FILENO)
 
-spinner = rich_spinner('dots', text='Initializing', style="bold blue")
-scroll_list: list[rich_spinner | str] = []
+spinner = Spinner('dots', text='Initializing', style="bold blue")
+scroll_list: list[Spinner | str] = []
 notice: set[str] = set()
-live = rich_live(redirect_stdout=False)
+live = Live(redirect_stdout=False)
 
 class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress):
 
@@ -98,7 +94,7 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress):
 		scroll_list.append(spinner)
 
 	# OpProgress Method
-	def update(self, percent: Optional[float] = None) -> None:
+	def update(self, percent: float | None = None) -> None:
 		"""Called periodically to update the user interface."""
 		base.OpProgress.update(self, percent)
 		if self.verbose:
@@ -153,13 +149,13 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress):
 	def ims_hit(self, item: apt_pkg.AcquireItemDesc) -> None:
 		"""Called when an item is update (e.g. not modified on the server)."""
 		base.AcquireProgress.ims_hit(self, item)
-		self.write_update('No Change:', GREEN, item)
+		self.write_update('No Change:', 'GREEN', item)
 
 	def fail(self, item: apt_pkg.AcquireItemDesc) -> None:
 		"""Called when an item is failed."""
 		base.AcquireProgress.fail(self, item)
 		if item.owner.status == item.owner.STAT_DONE:
-			self._write(f"{color('Ignored:  ', YELLOW)} {item.description}")
+			self._write(f"{color('Ignored:  ', 'YELLOW')} {item.description}")
 		else:
 			self._write(ERROR_PREFIX+item.description)
 			self._write(f"  {item.owner.error_text}")
@@ -170,7 +166,7 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress):
 		# It's complete already (e.g. Hit)
 		if item.owner.complete:
 			return
-		self.write_update('Updated:  ', BLUE, item)
+		self.write_update('Updated:  ', 'BLUE', item)
 
 	def write_update(self, msg: str, _color: int, item: apt_pkg.AcquireItemDesc) -> None:
 		"""Writes the update from either hit or fetch."""
@@ -248,7 +244,7 @@ class InstallProgress(base.InstallProgress):
 		"""Start update."""
 		if not self.verbose and not self.raw_dpkg:
 			live.start()
-			spinner.update(text=color('Initializing dpkg...', BLUE))
+			spinner.update(text=color('Initializing dpkg...', 'BLUE'))
 
 	def finish_update(self) -> None:
 		"""Called when update has finished."""
@@ -258,7 +254,7 @@ class InstallProgress(base.InstallProgress):
 			print('\n'+color('Notices:'))
 			for notice_msg in notice:
 				print(notice_msg)
-		print(color("Finished Successfully", GREEN))
+		print(color("Finished Successfully", 'GREEN'))
 
 	def __exit__(self, _type: object, value: object, traceback: object) -> None:
 		"""Exit."""
@@ -299,7 +295,7 @@ class InstallProgress(base.InstallProgress):
 				termios.tcsetattr(STDIN_FILENO, termios.TCSAFLUSH, TERM_MODE)
 		return 0
 
-	def sigwinch_passthrough(self, _sig_dummy: int, _data_dummy: Optional[FrameType]) -> None:
+	def sigwinch_passthrough(self, _sig_dummy: int, _data_dummy: FrameType | None) -> None:
 		"""Pass through sigwinch signals to dpkg."""
 		buffer = struct.pack("HHHH", 0, 0, 0, 0)
 		term_size = struct.unpack('hhhh', fcntl.ioctl(STDOUT_FILENO,
@@ -311,7 +307,7 @@ class InstallProgress(base.InstallProgress):
 		"""Checks if we get a conf prompt"""
 		# I wish they would just use debconf for this.
 		# But here we are and this is what we're doing for config files
-		for line in CONF_MESSAGE:
+		for line in DPKG_MSG['CONF_MESSAGE']:
 			# We only iterate the whole list just in case. We don't want to miss this.
 			# Even if we just hit the last line it's better than not hitting it.
 			if line in rawline:
@@ -328,8 +324,8 @@ class InstallProgress(base.InstallProgress):
 
 	def conf_end(self, rawline: bytes) -> bool:
 		"""Checks to see if the conf prompt is over."""
-		return rawline == CR+LF and (CONF_MESSAGE[9] in self.last_line
-										or self.last_line in CONF_ANSWER)
+		return rawline == CR+LF and (DPKG_MSG['CONF_MESSAGE'][9] in self.last_line
+										or self.last_line in DPKG_MSG['CONF_ANSWER'])
 
 	def format_dpkg_output(self, rawline: bytes) -> None:
 		"""Method that facilitates what needs to happen to dpkg output."""
@@ -344,7 +340,7 @@ class InstallProgress(base.InstallProgress):
 
 		# These are real spammy the way we set this up
 		# So if we're in verbose just send it
-		for item in DPKG_STATUS:
+		for item in DPKG_MSG['DPKG_STATUS']:
 			if item in rawline:
 				if self.verbose:
 					os.write(STDOUT_FILENO, rawline)
@@ -407,12 +403,12 @@ class InstallProgress(base.InstallProgress):
 
 def check_line_spam(line: str, rawline: bytes) -> bool:
 	"""Checks for, and handles, notices and spam."""
-	for message in NOTICES:
+	for message in DPKG_MSG['NOTICES']:
 		if message in rawline:
 			notice.add(line)
 			return False
 
-	return any(item in line for item in SPAM)
+	return any(item in line for item in DPKG_MSG['SPAM'])
 
 def raw_init() -> None:
 	"""Initialize raw terminal output."""
@@ -427,22 +423,22 @@ def msg_formatter(line: str) -> str:
 	for word in line.split():
 		match = re.fullmatch(r'\(.*.\)', word)
 		if word == 'Removing':
-			msg += color('Removing:   ', RED)
+			msg += color('Removing:   ', 'RED')
 		elif word == 'Unpacking':
-			msg += color('Unpacking:  ', GREEN)
+			msg += color('Unpacking:  ', 'GREEN')
 		elif word == 'Setting':
-			msg += color('Setting ', GREEN)
+			msg += color('Setting ', 'GREEN')
 		elif word == 'up':
-			msg += color('up: ', GREEN)
+			msg += color('up: ', 'GREEN')
 		elif word == 'Processing':
-			msg += color('Processing: ', GREEN)
+			msg += color('Processing: ', 'GREEN')
 		elif word == '...':
 			continue
 		elif match:
 			word = re.sub('[()]', '', word)
 			paren = color('(')
 			paren2 = color(')')
-			msg += (' ') + paren+color(word, BLUE)+paren2
+			msg += (' ') + paren+color(word, 'BLUE')+paren2
 		else:
 			msg += ' ' + word
 	return msg
@@ -463,7 +459,7 @@ def scroll_bar(msg: str | None = None) -> None:
 	if len(scroll_list) > scroll_lines and len(scroll_list) > 10:
 		del scroll_list[0]
 
-	table = rich_grid()
+	table = Table.grid()
 	table.add_column(no_wrap=True)
 	for item in scroll_list:
 		table.add_row(item)
@@ -538,11 +534,11 @@ class AptExpect(fdspawn): # type: ignore[misc]
 						split = os.write(self.child_fd, data)
 						data = data[split:]
 			except KeyboardInterrupt:
-				warn = color("Warning: ", YELLOW)
+				warn = color("Warning: ", 'YELLOW')
 				warn += "quitting now could break your system!"
 				if live.is_started:
 					scroll_list.append(warn)
-					scroll_list.append(color("Ctrl+C twice quickly will exit...", RED))
+					scroll_list.append(color("Ctrl+C twice quickly will exit...", 'RED'))
 					scroll_bar()
 				else:
 					os.write(STDOUT_FILENO, LF+warn.encode())
