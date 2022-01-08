@@ -125,6 +125,9 @@ def clean() -> None:
 def nala_history(apt: Nala, sudo:int) -> None | NoReturn:
 	"""Function for coordinating the history command."""
 	mode = arguments.mode
+	# Eventually we should probably make argparser better and handle this for us.
+	if mode and mode not in ('undo', 'redo', 'info', 'clear'):
+		sys.exit(ERROR_PREFIX+f"'{mode}' isn't a valid history command")
 	if mode and not arguments.id:
 		sys.exit(ERROR_PREFIX+'We need a transaction ID..')
 

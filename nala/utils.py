@@ -79,7 +79,7 @@ def iter_remove(path: Path, verbose: bool = False) -> None:
 			dprint(f'Removed: {file}')
 			file.unlink(missing_ok=True)
 
-def print_packages(headers: list[str], names: list[list[str | int]], title, style=None):
+def print_packages(headers: list[str], names: list[list[str]], title, style=None):
 	"""Prints package transactions in a pretty format."""
 	if not names:
 		return
@@ -94,12 +94,10 @@ def print_packages(headers: list[str], names: list[list[str | int]], title, styl
 		else:
 			package_table.add_column(header)
 
-	# Iterate to find if size is and integer and convert it before printing
-	for package in names[:]:
-		for item in package[:]:
-			if isinstance(item, int):
-				package.remove(item)
-				package.append(unit_str(item))
+	# Get the size and change it to size
+	for package in names:
+		size = package.pop()
+		package.append(unit_str(int(size)))
 
 	# Add our packages
 	for name in names:

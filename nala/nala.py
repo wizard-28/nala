@@ -299,9 +299,7 @@ class Nala:
 			if not arguments.assume_yes and not ask('Do you want to continue'):
 				print("Abort.")
 				return
-			# Importing this here right before we use it due to circular import
-			# Due to typing nala.install() in the write_history() function
-			#from nala.history import write_history
+
 			write_history(delete_names, install_names, upgrade_names)
 			write_log(pkgs)
 
@@ -441,8 +439,8 @@ class Nala:
 			return False
 
 	def print_update_summary(self,
-			delete_names: list[list[str | int]],
-			install_names: list[list[str | int]], upgrade_names: list[list[str | int]]) -> None:
+			delete_names: list[list[str]],
+			install_names: list[list[str]], upgrade_names: list[list[str]]) -> None:
 		"""Prints our transaction summary."""
 		delete = ('Purge', 'Purging:') if self.purge else ('Remove', 'Removing:')
 
@@ -580,7 +578,7 @@ def guess_concurrent(pkgs: list[Package]) -> int:
 		max_uris = 2
 	return max_uris
 
-def transaction_summary(names: list[list[str | int]], width: int, header: str) -> None:
+def transaction_summary(names: list[list[str]], width: int, header: str) -> None:
 	"""Prints a small transaction summary."""
 	# We should look at making this more readable
 	# Or integrating it somewhere else
@@ -592,30 +590,29 @@ def transaction_summary(names: list[list[str | int]], width: int, header: str) -
 			)
 
 def sort_pkg_changes(pkgs: list[Package]
-	) -> tuple[list[list[str | int]], list[list[str | int]], list[list[str | int]]]:
-
+	) -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
 	"""Sorts a list of packages and splits them based on the action to take."""
-	delete_names: list[list[str | int]] = []
-	install_names: list[list[str | int]] = []
-	upgrade_names: list[list[str | int]] = []
+	delete_names: list[list[str]] = []
+	install_names: list[list[str]] = []
+	upgrade_names: list[list[str]] = []
 
 	# TODO marked_downgrade, marked_keep, marked_reinstall
 	for pkg in pkgs:
-		installed = pkg_installed(pkg)
 		candidate = pkg_candidate(pkg)
 		if pkg.marked_delete:
+			installed = pkg_installed(pkg)
 			delete_names.append(
-				[pkg.name, installed.version, candidate.size]
+				[pkg.name, installed.version, str(candidate.size)]
 			)
 
 		elif pkg.marked_install:
 			install_names.append(
-				[pkg.name, candidate.version, candidate.size]
+				[pkg.name, candidate.version, str(candidate.size)]
 			)
 
 		elif pkg.marked_upgrade:
 			upgrade_names.append(
-				[pkg.name, installed.version, candidate.version, candidate.size]
+				[pkg.name, installed.version, candidate.version, str(candidate.size)]
 			)
 	return list(delete_names), install_names, upgrade_names
 
