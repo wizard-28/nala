@@ -88,11 +88,13 @@ def history() -> None:
 		history_table.add_row(*item)
 	console.print(history_table)
 
-def get_hist_package(hist_entry: dict[str, str | list[str] | list[list[str]]], key: str) -> list[list[str]]:
+def get_hist_package(
+	hist_entry: dict[str, str | list[str] | list[list[str]]], key: str) -> list[list[str]]:
 	"""Type enforce history package is list of lists."""
 	return [pkg_list for pkg_list in hist_entry[key] if isinstance(pkg_list, list)]
 
-def get_hist_list(hist_entry: dict[str, str | list[str] | list[list[str]]], key: str) -> list[str]:
+def get_hist_list(
+	hist_entry: dict[str, str | list[str] | list[list[str]]], key: str) -> list[str]:
 	"""Type enforce history package is list of strings."""
 	return [pkg for pkg in hist_entry[key] if isinstance(pkg, str)]
 
@@ -211,7 +213,9 @@ def get_history(hist_id: str) -> dict[str, str | list[str] | list[list[str]]]:
 	dprint(f"Getting history {hist_id}")
 	if not NALA_HISTORY.exists():
 		sys.exit("No history exists..")
-	history_file: dict[str, dict[str, str | list[str] | list[list[str]]]] = json.loads(NALA_HISTORY.read_text(encoding='utf-8'))
+	history_file: dict[str, dict[str, str | list[str] | list[list[str]]]] = (
+		json.loads(NALA_HISTORY.read_text(encoding='utf-8'))
+	)
 	transaction = history_file.get(hist_id)
 	if transaction:
 		return transaction

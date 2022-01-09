@@ -71,22 +71,19 @@ class Nala:
 		# Turn off Rich scrolling if we don't have XTERM.
 		if arguments.raw_dpkg or 'xterm' not in os.environ["TERM"]:
 			arguments.verbose = True
-
 		# We want to update the cache before we initialize it
 		if not no_update:
 			print('Updating package list...')
 			try:
-				Cache().update(UpdateProgress(verbose=arguments.verbose))
+				Cache().update(UpdateProgress())
 			except (LockFailedException, FetchFailedException) as err:
 				apt_error(err)
 		try:
-			self.cache = Cache(UpdateProgress(verbose=arguments.verbose))
+			self.cache = Cache(UpdateProgress())
 		except (LockFailedException, FetchFailedException) as err:
 			apt_error(err)
 
 		self.hash_check = hash_check
-		# This is just a flag to check if we downloaded anything
-		self.downloaded = False
 		self.purge = False
 
 		self.archive_dir = Path(apt_pkg.config.find_dir('Dir::Cache::Archives'))
@@ -344,8 +341,8 @@ class Nala:
 
 		try:
 			self.cache.commit(
-				UpdateProgress(arguments.verbose, arguments.debug),
-				InstallProgress(arguments.verbose, arguments.debug, arguments.raw_dpkg)
+				UpdateProgress(),
+				InstallProgress()
 			)
 		except apt_pkg.Error as err:
 			sys.exit(f'\r\n{ERROR_PREFIX+str(err)}')
@@ -403,8 +400,12 @@ class Nala:
 			download_progress(pkgs, proc)
 
 		proc.wait()
+		link_success = self.check_debs(pkgs, partial_dir)
+		return proc.returncode == 0 and link_success
+
+	def check_debs(self, pkgs: list[Package], partial_dir: Path) -> bool:
+		"""Checks the downloaded debs."""
 		link_success = True
-		self.downloaded = True
 		# Link archives/partial/*.deb to archives/
 		for pkg in pkgs:
 			filename = Path(pkg_candidate(pkg).filename).name
@@ -425,7 +426,7 @@ class Nala:
 				if err.errno != errno.ENOENT:
 					print("Failed to move archive file", err)
 				link_success = False
-		return proc.returncode == 0 and link_success
+		return link_success
 
 	def file_downloaded(self, pkg: Package, hash_check: bool = False) -> bool:
 		"""Checks if file has been downloaded and runs check hash."""
@@ -551,7 +552,6 @@ def make_metalink(out: TextIO, pkgs: list[Package]) -> None:
 	for pkg in pkgs:
 		candidate = pkg_candidate(pkg)
 		hashtype, hashvalue = get_hash(candidate)
-		Path(candidate.filename).name
 		out.write(f'<file name="{Path(candidate.filename).name}">')
 		out.write(f'<size>{candidate.size}</size>')
 		if hashtype:
@@ -594,52 +594,43 @@ def transaction_summary(names: list[list[str]], width: int, header: str) -> None
 			'Packages'
 			)
 
-def sort_pkg_changes(pkgs: list[Package]
+def sort_pkg_changes(pkgs: list[Package], log: bool = False
 	) -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
 	"""Sorts a list of packages and splits them based on the action to take."""
 	delete_names: list[list[str]] = []
 	install_names: list[list[str]] = []
 	upgrade_names: list[list[str]] = []
 
-	# TODO marked_downgrade, marked_keep, marked_reinstall
 	for pkg in pkgs:
 		candidate = pkg_candidate(pkg)
 		if pkg.marked_delete:
 			installed = pkg_installed(pkg)
+			if log:
+				delete_names.append([f"{pkg.name}:{installed.architecture} ({installed.version})"])
+				continue
 			delete_names.append(
 				[pkg.name, installed.version, str(candidate.size)]
 			)
 
 		elif pkg.marked_install:
+			if log:
+				install_names.append([f"{pkg.name}:{candidate.architecture} ({candidate.version})"])
+				continue
 			install_names.append(
 				[pkg.name, candidate.version, str(candidate.size)]
 			)
 
 		elif pkg.marked_upgrade:
+			if log:
+				upgrade_names.append([f"{pkg.name}:{candidate.architecture} ({candidate.version})"])
 			upgrade_names.append(
 				[pkg.name, installed.version, candidate.version, str(candidate.size)]
 			)
-	return list(delete_names), install_names, upgrade_names
+	return delete_names, install_names, upgrade_names
 
 def write_log(pkgs: list[Package]) -> None:
 	"""Write information to the log file."""
-	delete_names: list[str] = []
-	install_names: list[str] = []
-	upgrade_names: list[str] = []
-
-	# TODO marked_downgrade, marked_keep, marked_reinstall
-	for pkg in pkgs:
-		candidate = pkg_candidate(pkg)
-
-		if pkg.marked_delete:
-			installed = pkg_installed(pkg)
-			delete_names.append(f"{pkg.name}:{installed.architecture} ({installed.version})")
-
-		elif pkg.marked_install:
-			install_names.append(f"{pkg.name}:{candidate.architecture} ({candidate.version})")
-
-		elif pkg.marked_upgrade:
-			upgrade_names.append(f"{pkg.name}:{candidate.architecture} ({candidate.version})")
+	delete_names, install_names, upgrade_names = sort_pkg_changes(pkgs, log=True)
 
 	timezone = datetime.utcnow().astimezone().tzinfo
 	time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')+' '+str(timezone)
@@ -648,11 +639,11 @@ def write_log(pkgs: list[Package]) -> None:
 	iprint(f'Requested-By: {USER} ({UID})')
 
 	if delete_names:
-		iprint(f'Removed: {", ".join(delete_names)}')
+		iprint(f'Removed: {", ".join(delete_names[0])}')
 	if install_names:
-		iprint(f'Installed: {", ".join(install_names)}')
+		iprint(f'Installed: {", ".join(install_names[0])}')
 	if upgrade_names:
-		iprint(f'Upgraded: {", ".join(upgrade_names)}')
+		iprint(f'Upgraded: {", ".join(upgrade_names[0])}')
 
 	logger_newline()
 

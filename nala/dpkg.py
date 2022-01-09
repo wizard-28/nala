@@ -45,6 +45,7 @@ from pexpect.utils import poll_ignore_interrupts
 
 from nala.rich import Table, Live, Spinner
 from nala.constants import DPKG_LOG, TERM_SIZE, DPKG_MSG, ERROR_PREFIX, SPAM
+from nala.options import arguments
 from nala.utils import color
 
 # Control Codes
@@ -75,7 +76,7 @@ live = Live(redirect_stdout=False)
 class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress): # type: ignore[misc]
 
 	"""Class for getting cache update status and printing to terminal."""
-	def __init__(self, verbose: bool=False, debug: bool=False) -> None:
+	def __init__(self) -> None:
 		"""Class for getting cache update status and printing to terminal."""
 		text.TextProgress.__init__(self)
 		base.AcquireProgress.__init__(self)
@@ -84,10 +85,9 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress): 
 		self._signal = None
 		self._id = 1
 		self._width = 80
-		self.verbose=verbose
 		self.old_op = "" # OpProgress setting
-		if debug:
-			self.verbose=True
+		if arguments.debug:
+			arguments.verbose=True
 
 		spinner.update(text='Initializing Cache')
 		scroll_list.clear()
@@ -97,7 +97,7 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress): 
 	def update(self, percent: float | None = None) -> None:
 		"""Called periodically to update the user interface."""
 		base.OpProgress.update(self, percent)
-		if self.verbose:
+		if arguments.verbose:
 			if self.major_change and self.old_op:
 				self._write(self.old_op)
 			self._write(f"{self.op}... {self.percent}%\r", False, True)
@@ -107,14 +107,14 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress): 
 	def done(self, _dummy_variable:None = None) -> None:
 		"""Called once an operation has been completed."""
 		base.OpProgress.done(self)
-		if self.verbose:
+		if arguments.verbose:
 			if self.old_op:
 				self._write(f"\r{self.old_op}... Done", True, True)
 			self.old_op = ""
 
 	def _write(self, msg: str, newline: bool = True, maximize: bool = False) -> None:
 		"""Write the message on the terminal, fill remaining space."""
-		if self.verbose:
+		if arguments.verbose:
 			self._file.write("\r")
 			self._file.write(msg)
 
@@ -214,21 +214,14 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress): 
 class InstallProgress(base.InstallProgress): # type: ignore[misc]
 
 	"""Class for getting dpkg status and printing to terminal."""
-	def __init__(self,
-		verbose: bool = False,
-		debug: bool = False,
-		raw_dpkg: bool = False) -> None:
+	def __init__(self) -> None:
 		base.InstallProgress.__init__(self)
-		self.verbose = verbose
-		self.debug = debug
-		self.raw_dpkg = raw_dpkg
 		self.raw = False
 		self.last_line = b''
 		self.dpkg_log: TextIO
 		self.child: AptExpect
 		self.child_fd: int
-
-		if self.raw_dpkg:
+		if arguments.raw_dpkg:
 			tty.setraw(STDIN_FILENO)
 
 		# Setting environment to xterm seems to work find for linux terminal
@@ -242,13 +235,13 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc]
 
 	def start_update(self) -> None:
 		"""Start update."""
-		if not self.verbose and not self.raw_dpkg:
+		if not arguments.verbose and not arguments.raw_dpkg:
 			live.start()
 			spinner.update(text=color('Initializing dpkg...', 'BLUE'))
 
 	def finish_update(self) -> None:
 		"""Called when update has finished."""
-		if not self.verbose and not self.raw_dpkg:
+		if not arguments.verbose and not arguments.raw_dpkg:
 			live.stop()
 		if notice:
 			print('\n'+color('Notices:'))
@@ -334,7 +327,7 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc]
 		self.dpkg_log.write(repr(rawline)+'\n')
 		self.dpkg_log.flush()
 
-		if self.raw_dpkg:
+		if arguments.raw_dpkg:
 			os.write(STDOUT_FILENO, rawline)
 			return
 
@@ -342,7 +335,7 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc]
 		# So if we're in verbose just send it
 		for item in DPKG_MSG['DPKG_STATUS']:
 			if item in rawline:
-				if self.verbose:
+				if arguments.verbose:
 					os.write(STDOUT_FILENO, rawline)
 				else:
 					spinner.update(text=color(rawline.decode().strip()))
@@ -376,7 +369,7 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc]
 		# Main format section for making things pretty
 		msg = msg_formatter(line)
 		# If verbose we just send it. No bars
-		if self.verbose:
+		if arguments.verbose:
 			# We have to append Carriage return and new line or things get weird
 			os.write(STDOUT_FILENO, (msg+'\r\n').encode())
 		else:

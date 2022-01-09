@@ -21,7 +21,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with nala.  If not, see <https://www.gnu.org/licenses/>.
-
+"""Where Utilities who don't have a special home come together."""
 from __future__ import annotations
 
 import sys
@@ -55,12 +55,11 @@ def ask(question: str, default_no: bool = False) -> bool:
 		resp = input(f'{question}? [Y/n] ')
 		if resp in ('y', 'Y'):
 			return True
-		elif resp in ('n', 'N'):
+		if resp in ('n', 'N'):
 			return False
-		elif resp == '':
+		if resp == '':
 			return not default_no
-		else:
-			print("Not a valid choice kiddo")
+		print("Not a valid choice kiddo")
 
 def unit_str(val: int, just: int = 7) -> str:
 	"""Check integer and figure out what format it should be."""
@@ -79,7 +78,9 @@ def iter_remove(path: Path, verbose: bool = False) -> None:
 			dprint(f'Removed: {file}')
 			file.unlink(missing_ok=True)
 
-def print_packages(headers: list[str], names: list[list[str]], title: str, style: str | None = None) -> None:
+def print_packages(
+	headers: list[str], names: list[list[str]],
+	title: str, style: str | None = None) -> None:
 	"""Prints package transactions in a pretty format."""
 	if not names:
 		return

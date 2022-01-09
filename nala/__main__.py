@@ -135,7 +135,7 @@ def nala_history(apt: Nala, sudo:int) -> None:
 		try:
 			# We are basically just type checking here
 			int(arguments.id)
-		except ValueError as e:
+		except ValueError:
 			sys.exit(ERROR_PREFIX+'Option must be a number..')
 	if not mode:
 		history()

@@ -21,7 +21,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with nala.  If not, see <https://www.gnu.org/licenses/>.
-
+"""Rich options for Nala output."""
 from __future__ import annotations
 
 from rich.progress import (BarColumn, Progress, Task,
