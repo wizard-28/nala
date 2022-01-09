@@ -29,18 +29,18 @@ from getpass import getuser
 from os import geteuid
 from typing import NoReturn
 
+from nala.constants import (ARCHIVE_DIR, CAT_ASCII, ERROR_PREFIX,
+				LISTS_DIR, LISTS_PARTIAL_DIR, PARTIAL_DIR, PKGCACHE, SRCPKGCACHE)
 from nala.fetch import fetch
+from nala.history import history, history_clear, history_info, history_undo
 from nala.logger import dprint, esyslog
 from nala.nala import Nala
-from nala.history import history, history_info, history_clear, history_undo
 from nala.options import arguments, parser
-from nala.utils import iter_remove, dir_check
-from nala.constants import (CAT_ASCII, ERROR_PREFIX, ARCHIVE_DIR,
-				LISTS_DIR, PKGCACHE, SRCPKGCACHE, PARTIAL_DIR, LISTS_PARTIAL_DIR)
+from nala.utils import dir_check, iter_remove
 
 
 def _main() -> None:
-	"""This is the main Nala function."""
+	"""Nala Main."""
 	if not arguments.command and not arguments.update:
 		parser.print_help()
 		sys.exit(1)
@@ -65,7 +65,7 @@ def _main() -> None:
 		not_apt_command()
 
 def apt_command(sudo: int) -> NoReturn:
-	"""Commands that require initializing the apt cache."""
+	"""Command which require initializing the apt cache."""
 	apt = init_apt()
 	if arguments.command in ('update', 'upgrade'):
 		apt.upgrade(dist_upgrade=arguments.no_full)
@@ -91,7 +91,7 @@ def apt_command(sudo: int) -> NoReturn:
 	sys.exit(0)
 
 def not_apt_command() -> NoReturn:
-	"""Commands that do not require initializing the apt cache."""
+	"""Command which does not require initializing the apt cache."""
 	if arguments.command == 'clean':
 		clean()
 	elif arguments.command == 'fetch':
@@ -103,7 +103,7 @@ def not_apt_command() -> NoReturn:
 	sys.exit(0)
 
 def arg_check(args: list[str], msg: str) -> None:
-	"""Checks arguments and errors if no packages are specified."""
+	"""Check arguments and errors if no packages are specified."""
 	if not args:
 		sys.exit(ERROR_PREFIX+f'You must specify a package to {msg}')
 
@@ -123,7 +123,7 @@ def clean() -> None:
 	print("Cache has been cleaned")
 
 def nala_history(apt: Nala, sudo:int) -> None:
-	"""Function for coordinating the history command."""
+	"""Coordinate the history command."""
 	mode = arguments.mode
 	# Eventually we should probably make argparser better and handle this for us.
 	if mode and mode not in ('undo', 'redo', 'info', 'clear'):
@@ -153,13 +153,13 @@ def nala_history(apt: Nala, sudo:int) -> None:
 		history_clear(arguments.id)
 
 def sudo_check(sudo: int, root_action: str) -> None:
-	"""Checks for root and exits if not root."""
+	"""Check for root and exits if not root."""
 	if sudo != 0:
 		esyslog(f'{getuser()} tried to run [{" ".join(sys.argv)}] without permission')
 		sys.exit(ERROR_PREFIX+f'Nala needs root to {root_action}')
 
 def init_apt() -> Nala:
-	"""Initializes nala and determines if we update the cache or not."""
+	"""Initialize Nala and determines if we update the cache or not."""
 	no_update_list = ('remove', 'show', 'history', 'install', 'purge')
 	no_update = arguments.no_update
 	if arguments.command in no_update_list:
@@ -170,7 +170,7 @@ def init_apt() -> Nala:
 	return Nala(no_update)
 
 def moo_pls() -> None:
-	"""Pls moo."""
+	"""I beg, pls moo."""
 	moos = arguments.moo
 	moos = moos.count('moo')
 	dprint(f"moo number is {moos}")
@@ -187,7 +187,7 @@ def moo_pls() -> None:
 		print("...What did you expect to update?...")
 
 def main() -> None:
-	"""Main Nala function to reference from the entry point."""
+	"""Nala function to reference from the entry point."""
 	try:
 		_main()
 	except KeyboardInterrupt:

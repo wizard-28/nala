@@ -24,10 +24,10 @@
 """Nala fetch Module."""
 from __future__ import annotations
 
+import itertools
 import re
 import socket
 import sys
-import itertools
 from concurrent.futures import ThreadPoolExecutor
 
 import requests  # type: ignore[import]
@@ -36,10 +36,10 @@ from aptsources.distro import get_distro
 from pythonping import ping
 from rich.progress import TaskID
 
+from nala.constants import ERROR_PREFIX, NALA_SOURCES
 from nala.logger import dprint
 from nala.options import arguments, parser
-from nala.rich import fetch_progress, Table, Live
-from nala.constants import NALA_SOURCES, ERROR_PREFIX
+from nala.rich import Live, Table, fetch_progress
 from nala.utils import ask, color
 
 netselect_scored = []
@@ -48,7 +48,7 @@ DEBIAN = 'Debian'
 UBUNTU = 'Ubuntu'
 
 def net_select(mirror: str, task: TaskID, live: Live, total: int, num: int) -> None:
-	"""Takes a URL and pings the domain and scores the latency."""
+	"""Take a URL, ping the domain and score the latency."""
 	debugger = [f'Thread: {num}', f'Current Mirror: {mirror}']
 
 	if not arguments.debug:
@@ -95,7 +95,7 @@ def net_select(mirror: str, task: TaskID, live: Live, total: int, num: int) -> N
 			print(f"{color('URL:', 'YELLOW')} {mirror}\n")
 
 def ubuntu_mirror(country_list: tuple[str, ...] | None) -> tuple[str, ...]:
-	"""Gets and parses the Ubuntu mirror list."""
+	"""Get and parse the Ubuntu mirror list."""
 	print('Fetching Ubuntu mirrors...')
 	ubuntu = fetch_mirrors("https://launchpad.net/ubuntu/+archivemirrors-rss", '<item>')
 	# This is what one of our "Mirrors might look like after split"
@@ -115,7 +115,7 @@ def ubuntu_mirror(country_list: tuple[str, ...] | None) -> tuple[str, ...]:
 	return parse_mirror(UBUNTU, ubuntu, country_list)
 
 def debian_mirror(country_list: tuple[str, ...] | None) -> tuple[str, ...]:
-	"""Gets and parses the Debian mirror list."""
+	"""Get and parse the Debian mirror list."""
 	print('Fetching Debian mirrors...')
 	debian = fetch_mirrors("https://mirror-master.debian.org/status/Mirrors.masterlist", '\n\n')
 	arches = tuple(get_architectures())
@@ -132,7 +132,7 @@ def debian_mirror(country_list: tuple[str, ...] | None) -> tuple[str, ...]:
 	return parse_mirror(DEBIAN, debian, country_list, arches)
 
 def fetch_mirrors(url: str, splitter: str) -> tuple[str, ...]:
-	"""Attempts to fetch the url and split a list based on the splitter."""
+	"""Attempt to fetch the url and split a list based on the splitter."""
 	try:
 		mirror_list = requests.get(url).text.split(splitter)
 	except requests.ConnectionError:
@@ -144,7 +144,7 @@ def parse_mirror(
 		country_list: tuple[str, ...] | None,
 		arches: tuple[str, ...] | tuple[()] = ()
 	) -> tuple[str, ...]:
-	"""Parses the mirrors."""
+	"""Parse the mirror."""
 	mirror_set = set()
 	if arguments.verbose:
 		print('Parsing mirror list...')
@@ -163,7 +163,7 @@ def parse_mirror(
 	return tuple(mirror_set)
 
 def get_countries(master_mirror: tuple[str, ...]) -> tuple[str, ...]:
-	"""Iterates the mirror list and returns a set of all valid countries."""
+	"""Iterate the mirror list and return all valid countries."""
 	country_list = set()
 	# The way we split the information we get nice and pretty mirror selections
 	for mirror in master_mirror:
@@ -181,7 +181,7 @@ def get_countries(master_mirror: tuple[str, ...]) -> tuple[str, ...]:
 	return tuple(country_list)
 
 def debian_parser(mirror: str, arches: tuple[str, ...] | tuple[()]) -> str | None:
-	"""Parses the Debian mirror."""
+	"""Parse the Debian mirror."""
 	url = 'http://'
 	if 'Archive-http:' in mirror and all(arch in mirror for arch in arches):
 		for line in mirror.splitlines():
@@ -194,7 +194,7 @@ def debian_parser(mirror: str, arches: tuple[str, ...] | tuple[()]) -> str | Non
 	return url
 
 def ubuntu_parser(mirror: str) -> str | None:
-	"""Parses the Ubuntu mirror."""
+	"""Parse the Ubuntu mirror."""
 	# First section we get from Ubuntu is garbage. Let's ditch it and get to business
 	if '<title>Ubuntu Archive Mirrors Status</title>' in mirror:
 		return None
@@ -208,7 +208,7 @@ def ubuntu_parser(mirror: str) -> str | None:
 	return None
 
 def detect_release() -> tuple[str | None, ...]:
-	"""Detects the distro and release."""
+	"""Detect the distro and release."""
 	try:
 		lsb = get_distro()
 		distro = lsb.id
@@ -225,7 +225,7 @@ def detect_release() -> tuple[str | None, ...]:
 	return None, None
 
 def fetch() -> None:
-	"""Fetches fast mirrors and write to nala-sources.list."""
+	"""Fetch fast mirrors and write nala-sources.list."""
 	if (NALA_SOURCES.exists() and not arguments.assume_yes and
 	    not ask(f'{NALA_SOURCES.name} already exists.\ncontinue and overwrite it')
 	    ):

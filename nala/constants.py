@@ -21,7 +21,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with nala.  If not, see <https://www.gnu.org/licenses/>.
-"""Module for file constants"""
+"""Module for file constants."""
 from __future__ import annotations
 
 from pathlib import Path

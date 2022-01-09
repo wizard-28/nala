@@ -24,19 +24,20 @@
 """Rich options for Nala output."""
 from __future__ import annotations
 
-from rich.progress import (BarColumn, Progress, Task,
-				TextColumn, filesize, DownloadColumn, TransferSpeedColumn)
-from rich.text import Text
-from rich.live import Live
-from rich.table import Table, Column
-from rich.spinner import Spinner
 from rich.console import Console
+from rich.live import Live
+from rich.progress import (BarColumn, DownloadColumn,
+				Progress, Task, TextColumn, TransferSpeedColumn, filesize)
+from rich.spinner import Spinner
 from rich.style import Style
+from rich.table import Column, Table
+from rich.text import Text
 
-__all__ = ['Spinner', 'Table', 'Column', 'Live']
+__all__ = ('Spinner', 'Table', 'Column', 'Live')
 
 class NalaTransferSpeed(TransferSpeedColumn): # type: ignore[misc]
 	"""Subclass of TransferSpeedColumn."""
+
 	def render(self, task: Task) -> Text:
 		"""Show data transfer speed."""
 		speed = task.finished_speed or task.speed
@@ -47,6 +48,7 @@ class NalaTransferSpeed(TransferSpeedColumn): # type: ignore[misc]
 
 class NalaDownload(DownloadColumn): # type: ignore[misc]
 	"""Subclass of DownloadColumn."""
+
 	def render(self, task: Task) -> Text:
 		"""Calculate common unit for completed and total."""
 		completed = int(task.completed)

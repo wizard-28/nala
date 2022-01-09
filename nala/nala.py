@@ -31,10 +31,10 @@ import fnmatch
 import hashlib
 import os
 import sys
+from copy import deepcopy
 from datetime import datetime
 from getpass import getuser
 from os import environ, getuid
-from copy import deepcopy
 from pathlib import Path
 from subprocess import Popen
 from typing import Any, NoReturn, TextIO
@@ -42,15 +42,15 @@ from typing import Any, NoReturn, TextIO
 import apt_pkg
 import requests  # type: ignore[import]
 from apt.cache import Cache, FetchFailedException, LockFailedException
-from apt.package import Package, Version, Dependency
+from apt.package import Dependency, Package, Version
 
+from nala.constants import COLUMNS, ERROR_PREFIX
 from nala.dpkg import InstallProgress, UpdateProgress
+from nala.history import write_history
 from nala.logger import dprint, iprint, logger_newline
 from nala.options import arguments
-from nala.rich import pkg_download_progress, Table, Live
-from nala.constants import ERROR_PREFIX, COLUMNS
-from nala.utils import ask, color, unit_str, print_packages, shell
-from nala.history import write_history
+from nala.rich import Live, Table, pkg_download_progress
+from nala.utils import ask, color, print_packages, shell, unit_str
 
 try:
 	USER: str = environ["SUDO_USER"]
@@ -63,10 +63,10 @@ NALA_DIR = Path('/var/lib/nala')
 NALA_HISTORY = Path('/var/lib/nala/history')
 
 class Nala:
+	"""Manage Nala operations."""
 
-	"""This is the main object for managing Nala operations."""
-	def __init__(self,	no_update: bool = False,
-						hash_check: bool = False) -> None:
+	def __init__(self,	no_update: bool = False) -> None:
+		"""Manage Nala operations."""
 		# If raw_dpkg is enabled likely they want to see the update too.
 		# Turn off Rich scrolling if we don't have XTERM.
 		if arguments.raw_dpkg or 'xterm' not in os.environ["TERM"]:
@@ -83,9 +83,7 @@ class Nala:
 		except (LockFailedException, FetchFailedException) as err:
 			apt_error(err)
 
-		self.hash_check = hash_check
 		self.purge = False
-
 		self.archive_dir = Path(apt_pkg.config.find_dir('Dir::Cache::Archives'))
 		"""/var/cache/apt/archives/"""
 		if not self.archive_dir:
@@ -97,13 +95,13 @@ class Nala:
 		self.nala_depends = ['nala', 'python3-pyshell']
 
 	def upgrade(self, dist_upgrade: bool = False) -> None:
-		"""Method for the (update, upgrade) command."""
+		"""Upgrade pkg[s]."""
 		self.cache.upgrade(dist_upgrade=dist_upgrade)
 		self.auto_remover()
 		self.get_changes(upgrade=True)
 
 	def glob_filter(self, pkg_names: list[str]) -> list[str]:
-		"""Filters provided packages and globs *."""
+		"""Filter provided packages and glob *."""
 		packages = self.cache.keys()
 		new_packages: list[str] = []
 
@@ -120,7 +118,7 @@ class Nala:
 		return new_packages
 
 	def install(self, pkg_names: list[str]) -> None:
-		"""Method for the install command."""
+		"""Install pkg[s]."""
 		dprint(f"Install pkg_names: {pkg_names}")
 		not_found = []
 
@@ -151,7 +149,7 @@ class Nala:
 		self.get_changes()
 
 	def remove(self, pkg_names: list[str], purge: bool = False) -> None:
-		"""Method for the (remove, purge) command."""
+		"""Remove or Purge pkg[s]."""
 		dprint(f"Remove pkg_names: {pkg_names}")
 		not_found = []
 		not_installed = []
@@ -183,7 +181,7 @@ class Nala:
 		self.get_changes(remove=True)
 
 	def show(self, pkg_names: list[str]) -> None:
-		"""Method for the show command."""
+		"""Show package information."""
 		dprint(f"Show pkg_names: {pkg_names}")
 		print()
 		for pkg_name in pkg_names:
@@ -242,7 +240,7 @@ class Nala:
 				sys.exit(f"{ERROR_PREFIX}{color(pkg_name, 'YELLOW')} not found")
 
 	def auto_remover(self) -> None:
-		"""Method for handling auto removal of packages."""
+		"""Handle auto removal of packages."""
 		autoremove = []
 
 		for pkg in self.cache:
@@ -259,7 +257,7 @@ class Nala:
 		dprint(f"Pkgs marked by autoremove: {autoremove}")
 
 	def check_essential(self, pkgs: list[Package]) -> None:
-		"""Method for checking removal of essential packages."""
+		"""Check removal of essential packages."""
 		for pkg in pkgs:
 			if pkg.is_installed:
 				# do not allow the removal of essential or required packages
@@ -276,7 +274,6 @@ class Nala:
 
 	def get_changes(self, upgrade: bool = False, remove: bool = False) -> None:
 		"""Get packages requiring changes and process them."""
-
 		def pkg_name(pkg: Package) -> str:
 			"""Sort by package name."""
 			return str(pkg.name)
@@ -305,9 +302,9 @@ class Nala:
 			write_history(delete_names, install_names, upgrade_names)
 			write_log(pkgs)
 
-			pkgs = [pkg for pkg in pkgs if not pkg.marked_delete and \
-						not self.file_downloaded(pkg, hash_check = \
-													  self.hash_check)]
+			pkgs = [
+				pkg for pkg in pkgs if not pkg.marked_delete and not self.file_downloaded(pkg)
+			]
 
 			if not self.download(pkgs, num_concurrent=guess_concurrent(pkgs)):
 				print("Some downloads failed. apt_pkg will take care of them.")
@@ -318,7 +315,7 @@ class Nala:
 			self.start_dpkg()
 
 	def start_dpkg(self) -> None:
-		"""Method for setting environment and starting dpkg."""
+		"""Set environment and start dpkg."""
 		# Lets get our environment variables set before we get down to business
 		if arguments.noninteractive:
 			environ["DEBIAN_FRONTEND"] = "noninteractive"
@@ -348,7 +345,7 @@ class Nala:
 			sys.exit(f'\r\n{ERROR_PREFIX+str(err)}')
 
 	def download(self, pkgs: list[Package], num_concurrent: int = 2) -> bool | None:
-		"""Method for beginning downloading of packages."""
+		"""Begin downloading packages."""
 		if not pkgs:
 			return True
 		partial_dir = self.archive_dir / 'partial'
@@ -364,8 +361,6 @@ class Nala:
 				   '--continue',
 				   '--split=1'
 				   ]
-		if self.hash_check:
-			cmdline.append('--check-integrity=true')
 
 		http_proxy = apt_pkg.config.find('Acquire::http::Proxy')
 		https_proxy = apt_pkg.config.find('Acquire::https::Proxy', http_proxy)
@@ -404,7 +399,7 @@ class Nala:
 		return proc.returncode == 0 and link_success
 
 	def check_debs(self, pkgs: list[Package], partial_dir: Path) -> bool:
-		"""Checks the downloaded debs."""
+		"""Check the downloaded debs."""
 		link_success = True
 		# Link archives/partial/*.deb to archives/
 		for pkg in pkgs:
@@ -429,7 +424,7 @@ class Nala:
 		return link_success
 
 	def file_downloaded(self, pkg: Package, hash_check: bool = False) -> bool:
-		"""Checks if file has been downloaded and runs check hash."""
+		"""Check if file has been downloaded and runs check hash."""
 		candidate = pkg_candidate(pkg)
 		path = self.archive_dir / Path(candidate.filename).name
 		if not path.exists() or path.stat().st_size != candidate.size:
@@ -447,7 +442,7 @@ class Nala:
 	def print_update_summary(self,
 			delete_names: list[list[str]],
 			install_names: list[list[str]], upgrade_names: list[list[str]]) -> None:
-		"""Prints our transaction summary."""
+		"""Print our transaction summary."""
 		delete = ('Purge', 'Purging:') if self.purge else ('Remove', 'Removing:')
 
 		print_packages(
@@ -501,7 +496,8 @@ class Nala:
 			print("Nala will only download the packages")
 
 def pkg_error(pkg_list: list[str], msg: str, banter: str = '', terminate: bool = False) -> None:
-	"""
+	"""Print error for package in list.
+
 	banter is optional and can be one of::
 
 		apt: "Maybe apt will let you"
@@ -584,7 +580,7 @@ def guess_concurrent(pkgs: list[Package]) -> int:
 	return max_uris
 
 def transaction_summary(names: list[list[str]], width: int, header: str) -> None:
-	"""Prints a small transaction summary."""
+	"""Print a small transaction summary."""
 	# We should look at making this more readable
 	# Or integrating it somewhere else
 	if names:
@@ -596,7 +592,7 @@ def transaction_summary(names: list[list[str]], width: int, header: str) -> None
 
 def sort_pkg_changes(pkgs: list[Package], log: bool = False
 	) -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
-	"""Sorts a list of packages and splits them based on the action to take."""
+	"""Sort a list of packages and splits them based on the action to take."""
 	delete_names: list[list[str]] = []
 	install_names: list[list[str]] = []
 	upgrade_names: list[list[str]] = []
@@ -648,7 +644,7 @@ def write_log(pkgs: list[Package]) -> None:
 	logger_newline()
 
 def dep_format(package_dependecy: list[Dependency]) -> None:
-	"""Formats dependencies for show."""
+	"""Format dependencies for show."""
 	for dep_list in package_dependecy:
 		dep_print = ''
 		for num, dep in enumerate(dep_list):
@@ -678,7 +674,7 @@ def pkg_installed(pkg: Package) -> Version:
 	return pkg.installed
 
 def download_progress(pkgs: list[Package], proc: Popen[Any]) -> None:
-	"""Monitors the downloads and prints a progress bar."""
+	"""Monitor the downloads and prints a progress bar."""
 	# Add up the size of all our packages so we know the total
 	total = sum(pkg_candidate(pkg).size for pkg in pkgs)
 	task = pkg_download_progress.add_task(
@@ -707,7 +703,7 @@ def download_progress(pkgs: list[Package], proc: Popen[Any]) -> None:
 				num += 1
 
 def apt_error(apt_err: FetchFailedException | LockFailedException) -> NoReturn:
-	"""Takes an error message from python-apt and formats it."""
+	"""Take an error message from python-apt and formats it."""
 	msg = str(apt_err)
 	if msg == '':
 		# Sometimes python apt gives us literally nothing to work with.

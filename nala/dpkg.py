@@ -29,10 +29,10 @@ import fcntl
 import os
 import re
 import signal
-import sys
-import tty
 import struct
+import sys
 import termios
+import tty
 from pty import STDIN_FILENO, STDOUT_FILENO, fork
 from time import sleep
 from types import FrameType
@@ -43,9 +43,9 @@ from apt.progress import base, text
 from pexpect.fdpexpect import fdspawn
 from pexpect.utils import poll_ignore_interrupts
 
-from nala.rich import Table, Live, Spinner
-from nala.constants import DPKG_LOG, TERM_SIZE, DPKG_MSG, ERROR_PREFIX, SPAM
+from nala.constants import DPKG_LOG, DPKG_MSG, ERROR_PREFIX, SPAM, TERM_SIZE
 from nala.options import arguments
+from nala.rich import Live, Spinner, Table
 from nala.utils import color
 
 # Control Codes
@@ -74,8 +74,8 @@ notice: set[str] = set()
 live = Live(redirect_stdout=False)
 
 class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress): # type: ignore[misc]
-
 	"""Class for getting cache update status and printing to terminal."""
+
 	def __init__(self) -> None:
 		"""Class for getting cache update status and printing to terminal."""
 		text.TextProgress.__init__(self)
@@ -95,7 +95,7 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress): 
 
 	# OpProgress Method
 	def update(self, percent: float | None = None) -> None:
-		"""Called periodically to update the user interface."""
+		"""Call periodically to update the user interface."""
 		base.OpProgress.update(self, percent)
 		if arguments.verbose:
 			if self.major_change and self.old_op:
@@ -105,7 +105,7 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress): 
 
 	# OpProgress Method
 	def done(self, _dummy_variable:None = None) -> None:
-		"""Called once an operation has been completed."""
+		"""Call once an operation has been completed."""
 		base.OpProgress.done(self)
 		if arguments.verbose:
 			if self.old_op:
@@ -147,12 +147,12 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress): 
 				spinner.update(text=msg)
 
 	def ims_hit(self, item: apt_pkg.AcquireItemDesc) -> None:
-		"""Called when an item is update (e.g. not modified on the server)."""
+		"""Call when an item is update (e.g. not modified on the server)."""
 		base.AcquireProgress.ims_hit(self, item)
 		self.write_update('No Change:', 'GREEN', item)
 
 	def fail(self, item: apt_pkg.AcquireItemDesc) -> None:
-		"""Called when an item is failed."""
+		"""Call when an item is failed."""
 		base.AcquireProgress.fail(self, item)
 		if item.owner.status == item.owner.STAT_DONE:
 			self._write(f"{color('Ignored:  ', 'YELLOW')} {item.description}")
@@ -161,7 +161,7 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress): 
 			self._write(f"  {item.owner.error_text}")
 
 	def fetch(self, item: apt_pkg.AcquireItemDesc) -> None:
-		"""Called when some of the item's data is fetched."""
+		"""Call when some of the item's data is fetched."""
 		base.AcquireProgress.fetch(self, item)
 		# It's complete already (e.g. Hit)
 		if item.owner.complete:
@@ -169,7 +169,7 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress): 
 		self.write_update('Updated:  ', 'BLUE', item)
 
 	def write_update(self, msg: str, _color: str, item: apt_pkg.AcquireItemDesc) -> None:
-		"""Writes the update from either hit or fetch."""
+		"""Write the update from either hit or fetch."""
 		line = f'{color(msg, _color)} {item.description}'
 		if item.owner.filesize:
 			size = apt_pkg.size_to_str(item.owner.filesize)
@@ -198,7 +198,7 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress): 
 		live.start()
 
 	def stop(self) -> None:
-		"""Invoked when the Acquire process stops running."""
+		"""Invoke when the Acquire process stops running."""
 		base.AcquireProgress.stop(self)
 		# Trick for getting a translation from apt
 		fetched = apt_pkg.size_to_str(self.fetched_bytes)
@@ -212,9 +212,10 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress): 
 		live.stop()
 
 class InstallProgress(base.InstallProgress): # type: ignore[misc]
-
 	"""Class for getting dpkg status and printing to terminal."""
+
 	def __init__(self) -> None:
+		"""Class for getting dpkg status and printing to terminal."""
 		base.InstallProgress.__init__(self)
 		self.raw = False
 		self.last_line = b''
@@ -233,14 +234,16 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc]
 		scroll_list.clear()
 		scroll_list.append(spinner)
 
-	def start_update(self) -> None:
+	@staticmethod
+	def start_update() -> None:
 		"""Start update."""
 		if not arguments.verbose and not arguments.raw_dpkg:
 			live.start()
 			spinner.update(text=color('Initializing dpkg...', 'BLUE'))
 
-	def finish_update(self) -> None:
-		"""Called when update has finished."""
+	@staticmethod
+	def finish_update() -> None:
+		"""Call when update has finished."""
 		if not arguments.verbose and not arguments.raw_dpkg:
 			live.stop()
 		if notice:
@@ -254,7 +257,7 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc]
 
 	def run(self, obj: apt_pkg.PackageManager | bytes | str) -> int:
 		"""
-		Install using the `PackageManager` object `obj`
+		Install using the `PackageManager` object `obj`.
 
 		returns the result of calling `obj.do_install()`
 		"""
@@ -297,7 +300,7 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc]
 			setwinsize(self.child_fd, term_size[0],term_size[1])
 
 	def conf_check(self, rawline: bytes) -> None:
-		"""Checks if we get a conf prompt"""
+		"""Check if we get a conf prompt."""
 		# I wish they would just use debconf for this.
 		# But here we are and this is what we're doing for config files
 		for line in DPKG_MSG['CONF_MESSAGE']:
@@ -316,12 +319,12 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc]
 				break
 
 	def conf_end(self, rawline: bytes) -> bool:
-		"""Checks to see if the conf prompt is over."""
+		"""Check to see if the conf prompt is over."""
 		return rawline == CR+LF and (DPKG_MSG['CONF_MESSAGE'][9] in self.last_line
 										or self.last_line in DPKG_MSG['CONF_ANSWER'])
 
 	def format_dpkg_output(self, rawline: bytes) -> None:
-		"""Method that facilitates what needs to happen to dpkg output."""
+		"""Facilitate what needs to happen to dpkg output."""
 		# During early development this is mandatory
 		# if self.debug:
 		self.dpkg_log.write(repr(rawline)+'\n')
@@ -357,7 +360,7 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc]
 		self.line_handler(rawline)
 
 	def line_handler(self, rawline: bytes) -> None:
-		"""Handles text operations if we're not using a rawline."""
+		"""Handle text operations for not a rawline."""
 		line = rawline.decode().strip()
 		if line == '':
 			return
@@ -378,7 +381,7 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc]
 		self.set_last_line(rawline)
 
 	def rawline_handler(self, rawline: bytes) -> None:
-		"""Handles text operations if we are using a rawline."""
+		"""Handle text operations for rawline."""
 		os.write(STDOUT_FILENO, rawline)
 		# Once we write we can check if we need to pop out of raw mode
 		if RESTORE_TERM in rawline or self.conf_end(rawline):
@@ -388,14 +391,14 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc]
 		self.set_last_line(rawline)
 
 	def set_last_line(self, rawline: bytes) -> None:
-		"""Sets the current line to last line if there is no backspace."""
+		"""Set the current line to last line if there is no backspace."""
 		# When at the conf prompt if you press Y, then backspace, then hit enter
 		# Things get really buggy so instead we check for a backspace
 		if BACKSPACE not in rawline:
 			self.last_line = rawline
 
 def check_line_spam(line: str, rawline: bytes) -> bool:
-	"""Checks for, and handles, notices and spam."""
+	"""Check for, and handle, notices and spam."""
 	for message in DPKG_MSG['NOTICES']:
 		if message in rawline:
 			notice.add(line)
@@ -411,7 +414,7 @@ def raw_init() -> None:
 	tty.setraw(STDIN_FILENO)
 
 def msg_formatter(line: str) -> str:
-	"""True formatter for dpkg output."""
+	"""Format dpkg output."""
 	msg = ''
 	for word in line.split():
 		match = re.fullmatch(r'\(.*.\)', word)
@@ -437,7 +440,7 @@ def msg_formatter(line: str) -> str:
 	return msg
 
 def scroll_bar(msg: str | None = None) -> None:
-	"""Prints msg to our scroll bar live display."""
+	"""Print msg to our scroll bar live display."""
 	if msg:
 		scroll_list.append(msg)
 
@@ -460,12 +463,11 @@ def scroll_bar(msg: str | None = None) -> None:
 	live.update(table)
 
 def control_code(code: bytes) -> None:
-	"""Wrapper for sending escape codes"""
+	"""Send escape codes."""
 	os.write(STDIN_FILENO, code)
 
 def setwinsize(file_descriptor: int, rows: int, cols: int) -> None:
-	"""
-	Set the terminal window size of the child tty.
+	"""Set the terminal window size of the child tty.
 
 	This will cause a SIGWINCH signal to be sent to the child. This does not
 	change the physical window size. It changes the size reported to
@@ -478,12 +480,12 @@ def setwinsize(file_descriptor: int, rows: int, cols: int) -> None:
 	fcntl.ioctl(file_descriptor, tiocswinz, size)
 
 class AptExpect(fdspawn): # type: ignore[misc]
-
 	"""Subclass of fdspawn to add the interact method."""
+
 	def interact(self, output_filter: Callable[[bytes], None]) -> None:
-		"""
-		Hacked up interact method because pexpect doesn't want to have one
-		for fdspawn
+		"""Hacked up interact method.
+
+		Because pexpect doesn't want to have one for fdspawn.
 
 		This gives control of the child process to the interactive user (the
 		human at the keyboard). Keystrokes are sent to the child process, and
@@ -491,7 +493,6 @@ class AptExpect(fdspawn): # type: ignore[misc]
 		simply echos the child stdout and child stderr to the real stdout and
 		it echos the real stdin to the child stdin.
 		"""
-
 		# Flush the buffer.
 		self.write_to_stdout(self.buffer)
 		self.stdout.flush()
@@ -505,7 +506,7 @@ class AptExpect(fdspawn): # type: ignore[misc]
 			termios.tcsetattr(STDIN_FILENO, termios.TCSAFLUSH, TERM_MODE)
 
 	def interact_copy(self, output_filter: Callable[[bytes], None]) -> None:
-		"""Used by the interact() method."""
+		"""Interact with the pty."""
 		while self.isalive():
 			try:
 				ready = poll_ignore_interrupts([self.child_fd, STDIN_FILENO])

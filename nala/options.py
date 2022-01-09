@@ -37,18 +37,22 @@ from nala.constants import LICENSE
 # Custom Parser for printing help on error.
 class NalaParser(argparse.ArgumentParser):
 	"""Subclass of ArgumentParser for better error."""
+
 	def error(self, message: str) -> NoReturn:
+		"""Send `--help` on error."""
 		sys.stderr.write(f'error: {message}\n')
 		self.print_help()
 		sys.exit(1)
 
 class GPLv3(argparse.Action):
-	"""Custom action to print the GPLv3 with `--license`."""
+	"""Print the GPLv3 with `--license`."""
+
 	def __init__(self,
 			option_strings: str,
 			dest: str = argparse.SUPPRESS,
 			default: str = argparse.SUPPRESS,
 			_help: str = 'reads the GPLv3'):
+		"""Print the GPLv3 with `--license`."""
 		super().__init__(
 			option_strings=option_strings,
 			dest=dest,
@@ -61,6 +65,7 @@ class GPLv3(argparse.Action):
 	args: argparse.Namespace,
 	values: str | Sequence[Any] | None,
 	option_string: None | str = None) -> None:
+		"""Print the GPLv3 with `--license`."""
 		if LICENSE.exists():
 			with open(LICENSE, encoding='utf-8') as file:
 				pager(file.read())
@@ -71,8 +76,7 @@ class GPLv3(argparse.Action):
 		parser.exit()
 
 def remove_options(argparser: NalaParser, **kwargs: bool) -> None:
-	"""
-	Removes options that we do not want in our help message.
+	"""Remove options that we do not want in our help message.
 
 	If an argument is True it will remove the option.
 	False to keep it.
@@ -91,7 +95,7 @@ def remove_options(argparser: NalaParser, **kwargs: bool) -> None:
 				action_group.remove(action)
 
 def remove_interactive_options(argparser: NalaParser) -> None:
-	"""Removes the dpkg options from help menu."""
+	"""Remove the dpkg options from help menu."""
 	action_group = argparser._action_groups
 	for group in action_group[:]:
 		if group.title == 'dpkg options':

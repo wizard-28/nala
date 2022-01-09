@@ -29,14 +29,14 @@ from pathlib import Path
 
 from pyshell import pyshell
 
+from nala.constants import COLOR_CODES, COLUMNS, ERROR_PREFIX
 from nala.logger import dprint
 from nala.rich import Table, console
-from nala.constants import COLUMNS, COLOR_CODES, ERROR_PREFIX
 
 shell = pyshell(capture_output=True, text=True, check=True)
 
 def color(text: str, text_color: str = 'WHITE') -> str:
-	"""Returns bold text in the color of your choice."""
+	"""Return bold text in the color of your choice."""
 	return f'\x1b[1;{COLOR_CODES[text_color]}m' + text + str(COLOR_CODES['RESET'])
 
 def dir_check(path: Path, msg: str) -> None:
@@ -45,7 +45,8 @@ def dir_check(path: Path, msg: str) -> None:
 		sys.exit(ERROR_PREFIX+msg)
 
 def ask(question: str, default_no: bool = False) -> bool:
-	"""
+	"""Ask the user {question}.
+
 	resp = input(f'{question}? [Y/n]
 
 	Y returns True
@@ -70,7 +71,7 @@ def unit_str(val: int, just: int = 7) -> str:
 	return f'{val :.0f}'.rjust(just)+" B"
 
 def iter_remove(path: Path, verbose: bool = False) -> None:
-	"""Iter the directory supplied and remove all files."""
+	"""Iterate the directory supplied and remove all files."""
 	if verbose:
 		print(f'Removing files in {path}')
 	for file in path.iterdir():
@@ -81,7 +82,7 @@ def iter_remove(path: Path, verbose: bool = False) -> None:
 def print_packages(
 	headers: list[str], names: list[list[str]],
 	title: str, style: str | None = None) -> None:
-	"""Prints package transactions in a pretty format."""
+	"""Print package transactions in a pretty format."""
 	if not names:
 		return
 

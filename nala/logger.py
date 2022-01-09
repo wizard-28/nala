@@ -28,8 +28,8 @@ import logging
 from logging.handlers import RotatingFileHandler, SysLogHandler
 from os import devnull, geteuid
 
-from nala.options import arguments
 from nala.constants import NALA_DEBUGLOG, NALA_LOGDIR, NALA_LOGFILE
+from nala.options import arguments
 
 # Define log levels for import
 INFO = 20
@@ -82,7 +82,7 @@ if arguments.debug:
 	logger.setLevel(DEBUG)
 
 def logger_newline() -> None:
-	"""Prints a blank newline in nala.log."""
+	"""Print a blank newline in nala.log."""
 	file_handler.setFormatter(empty_format)
 	iprint('')
 	file_handler.setFormatter(formatter)

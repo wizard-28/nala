@@ -24,25 +24,25 @@
 """Functions for handling Nala History."""
 from __future__ import annotations
 
-import sys
 import json
-from json.decoder import JSONDecodeError
+import sys
 from datetime import datetime
+from json.decoder import JSONDecodeError
 from shutil import get_terminal_size
 from typing import TYPE_CHECKING
 
 import jsbeautifier
 
-from nala.logger import dprint
-from nala.utils import print_packages
 from nala.constants import COLUMNS, ERROR_PREFIX, NALA_HISTORY
-from nala.rich import Table, Column, console
+from nala.logger import dprint
+from nala.rich import Column, Table, console
+from nala.utils import print_packages
 
 if TYPE_CHECKING:
 	from nala.nala import Nala
 
 def load_history_file() -> dict[str, dict[str, str | list[str] | list[list[str]]]]:
-	"""Loads Nala history"""
+	"""Load Nala history."""
 	try:
 		check = json.loads(NALA_HISTORY.read_text(encoding='utf-8'))
 		assert isinstance(check, dict)
@@ -59,7 +59,7 @@ def write_history_file(data: dict[str, dict[str, str | list[str] | list[list[str
 		file.write(jsbeautifier.beautify(json.dumps(data), options))
 
 def history() -> None:
-	"""Method for the history command."""
+	"""History command."""
 	if not NALA_HISTORY.exists():
 		print("No history exists..")
 		return
@@ -99,7 +99,7 @@ def get_hist_list(
 	return [pkg for pkg in hist_entry[key] if isinstance(pkg, str)]
 
 def history_info(hist_id: str) -> None:
-	"""Method for the history info command."""
+	"""History info command."""
 	dprint(f"History info {hist_id}")
 	hist_entry = get_history(hist_id)
 	dprint(f"History Entry: {hist_entry}")
@@ -128,7 +128,7 @@ def history_info(hist_id: str) -> None:
 		print(f'Upgraded {len(upgrade_names)} Packages')
 
 def history_clear(hist_id: str) -> None:
-	"""Method for the show command."""
+	"""Show command."""
 	dprint(f"History clear {hist_id}")
 	if not NALA_HISTORY.exists():
 		print("No history exists to clear..")
