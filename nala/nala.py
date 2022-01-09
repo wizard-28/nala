@@ -36,8 +36,10 @@ from datetime import datetime
 from getpass import getuser
 from os import environ, getuid
 from pathlib import Path
-from subprocess import Popen
-from typing import Any, NoReturn, TextIO
+from typing import TYPE_CHECKING, Any, NoReturn, TextIO
+
+if TYPE_CHECKING:
+	from subprocess import Popen
 
 import apt_pkg
 import requests  # type: ignore[import]
