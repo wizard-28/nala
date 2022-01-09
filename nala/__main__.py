@@ -39,7 +39,7 @@ from nala.constants import (CAT_ASCII, ERROR_PREFIX, ARCHIVE_DIR,
 				LISTS_DIR, PKGCACHE, SRCPKGCACHE, PARTIAL_DIR, LISTS_PARTIAL_DIR)
 
 
-def _main() -> NoReturn:
+def _main() -> None:
 	"""This is the main Nala function."""
 	if not arguments.command and not arguments.update:
 		parser.print_help()
@@ -102,7 +102,7 @@ def not_apt_command() -> NoReturn:
 		sys.exit(ERROR_PREFIX+'unknown error in "apt_command" function')
 	sys.exit(0)
 
-def arg_check(args, msg) -> NoReturn | None:
+def arg_check(args: list[str], msg: str) -> None:
 	"""Checks arguments and errors if no packages are specified."""
 	if not args:
 		sys.exit(ERROR_PREFIX+f'You must specify a package to {msg}')
@@ -122,7 +122,7 @@ def clean() -> None:
 	SRCPKGCACHE.unlink(missing_ok=True)
 	print("Cache has been cleaned")
 
-def nala_history(apt: Nala, sudo:int) -> None | NoReturn:
+def nala_history(apt: Nala, sudo:int) -> None:
 	"""Function for coordinating the history command."""
 	mode = arguments.mode
 	# Eventually we should probably make argparser better and handle this for us.
@@ -152,7 +152,7 @@ def nala_history(apt: Nala, sudo:int) -> None | NoReturn:
 		sudo_check(sudo, 'clear history')
 		history_clear(arguments.id)
 
-def sudo_check(sudo: int, root_action: str) -> None | NoReturn:
+def sudo_check(sudo: int, root_action: str) -> None:
 	"""Checks for root and exits if not root."""
 	if sudo != 0:
 		esyslog(f'{getuser()} tried to run [{" ".join(sys.argv)}] without permission')
@@ -186,7 +186,7 @@ def moo_pls() -> None:
 	if arguments.update:
 		print("...What did you expect to update?...")
 
-def main():
+def main() -> None:
 	"""Main Nala function to reference from the entry point."""
 	try:
 		_main()

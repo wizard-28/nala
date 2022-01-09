@@ -24,11 +24,9 @@
 
 from __future__ import annotations
 
-from rich.progress import (BarColumn, Progress, Text,
+from rich.progress import (BarColumn, Progress, Task,
 				TextColumn, filesize, DownloadColumn, TransferSpeedColumn)
-
-# pylint: disable=unused-import
-# These are imported so I can import all of them into other modules from here
+from rich.text import Text
 from rich.live import Live
 from rich.table import Table, Column
 from rich.spinner import Spinner
@@ -37,9 +35,9 @@ from rich.style import Style
 
 __all__ = ['Spinner', 'Table', 'Column', 'Live']
 
-class NalaTransferSpeed(TransferSpeedColumn):
+class NalaTransferSpeed(TransferSpeedColumn): # type: ignore[misc]
 	"""Subclass of TransferSpeedColumn."""
-	def render(self, task) -> Text:
+	def render(self, task: Task) -> Text:
 		"""Show data transfer speed."""
 		speed = task.finished_speed or task.speed
 		if speed is None:
@@ -47,9 +45,9 @@ class NalaTransferSpeed(TransferSpeedColumn):
 		data_speed = filesize.decimal(int(speed))
 		return Text(f"{data_speed}/s", style="bold blue")
 
-class NalaDownload(DownloadColumn):
+class NalaDownload(DownloadColumn): # type: ignore[misc]
 	"""Subclass of DownloadColumn."""
-	def render(self, task) -> Text:
+	def render(self, task: Task) -> Text:
 		"""Calculate common unit for completed and total."""
 		completed = int(task.completed)
 		total = int(task.total)

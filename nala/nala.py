@@ -40,7 +40,7 @@ from subprocess import Popen
 from typing import Any, NoReturn, TextIO
 
 import apt_pkg
-import requests
+import requests  # type: ignore[import]
 from apt.cache import Cache, FetchFailedException, LockFailedException
 from apt.package import Package, Version, Dependency
 
@@ -279,7 +279,12 @@ class Nala:
 
 	def get_changes(self, upgrade: bool = False, remove: bool = False) -> None:
 		"""Get packages requiring changes and process them."""
-		pkgs = sorted(self.cache.get_changes(), key=lambda p:p.name)
+
+		def pkg_name(pkg: Package) -> str:
+			"""Sort by package name."""
+			return str(pkg.name)
+
+		pkgs = sorted(self.cache.get_changes(), key=pkg_name)
 		if not NALA_DIR.exists():
 			NALA_DIR.mkdir()
 

@@ -173,5 +173,4 @@ DPKG_MSG: dict[str, tuple[bytes, ...]] = {
 	'CONF_MESSAGE' : CONF_MESSAGE,
 	'CONF_ANSWER' : CONF_ANSWER,
 	'NOTICES' : NOTICES,
-	'SPAM' : SPAM,
 	'DPKG_STATUS' : DPKG_STATUS,}

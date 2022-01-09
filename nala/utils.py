@@ -37,7 +37,7 @@ shell = pyshell(capture_output=True, text=True, check=True)
 
 def color(text: str, text_color: str = 'WHITE') -> str:
 	"""Returns bold text in the color of your choice."""
-	return f'\x1b[1;{COLOR_CODES[text_color]}m' + text + COLOR_CODES['RESET']
+	return f'\x1b[1;{COLOR_CODES[text_color]}m' + text + str(COLOR_CODES['RESET'])
 
 def dir_check(path: Path, msg: str) -> None:
 	"""Check to see if the directory exists in apt config."""
@@ -79,7 +79,7 @@ def iter_remove(path: Path, verbose: bool = False) -> None:
 			dprint(f'Removed: {file}')
 			file.unlink(missing_ok=True)
 
-def print_packages(headers: list[str], names: list[list[str]], title, style=None):
+def print_packages(headers: list[str], names: list[list[str]], title: str, style: str | None = None) -> None:
 	"""Prints package transactions in a pretty format."""
 	if not names:
 		return

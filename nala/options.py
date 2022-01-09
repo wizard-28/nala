@@ -21,21 +21,22 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with nala.  If not, see <https://www.gnu.org/licenses/>.
-
+"""Command line argument parsing."""
 from __future__ import annotations
 
 import argparse
 import sys
 from pathlib import Path
 from pydoc import pager
+from typing import Any, NoReturn, Sequence
 
 from nala import __version__
 from nala.constants import LICENSE
 
 
 # Custom Parser for printing help on error.
-class nalaParser(argparse.ArgumentParser):
-	def error(self, message):
+class NalaParser(argparse.ArgumentParser):
+	def error(self, message: str) -> NoReturn:
 		sys.stderr.write(f'error: {message}\n')
 		self.print_help()
 		sys.exit(1)
@@ -43,10 +44,10 @@ class nalaParser(argparse.ArgumentParser):
 # Custom Action for --license switch
 class GPLv3(argparse.Action):
 	def __init__(self,
-			option_strings,
-			dest=argparse.SUPPRESS,
-			default=argparse.SUPPRESS,
-			help='reads the GPLv3'):
+			option_strings: str,
+			dest: str = argparse.SUPPRESS,
+			default: str = argparse.SUPPRESS,
+			help: str = 'reads the GPLv3'):
 		super().__init__(
 			option_strings=option_strings,
 			dest=dest,
@@ -54,7 +55,11 @@ class GPLv3(argparse.Action):
 			nargs=0,
 			help=help)
 
-	def __call__(self, parser, args, values, option_string=None):
+	def __call__(self,
+	parser: argparse.ArgumentParser,
+	args: argparse.Namespace,
+	values: str | Sequence[Any] | None,
+	option_string: None | str = None) -> None:
 		if LICENSE.exists():
 			with open(LICENSE) as file:
 				pager(file.read())
@@ -64,38 +69,42 @@ class GPLv3(argparse.Action):
 			print('https://www.gnu.org/licenses/gpl-3.0.txt')
 		parser.exit()
 
-def remove_options(parser,
-	assume_yes=True, download_only=True,
-	update=True, no_update=True,
-	raw_dpkg=True, noninteractive=True):
+def remove_options(argparser: NalaParser,
+	assume_yes: bool = True, download_only: bool = True,
+	update: bool = True, no_update: bool = True,
+	raw_dpkg: bool = True) -> None:
+	"""
+	Removes options that we do not want in our help message.
 
-	for item in parser._optionals._group_actions[:]:
-		if assume_yes and '--assume-yes' in item.option_strings:
-			parser._optionals._group_actions.remove(item)
-		if download_only and '--download-only' in item.option_strings:
-			parser._optionals._group_actions.remove(item)
-		if no_update and '--no-update' in item.option_strings:
-			parser._optionals._group_actions.remove(item)
-		if update and '--update' in item.option_strings:
-			parser._optionals._group_actions.remove(item)
-		if raw_dpkg and '--raw-dpkg' in item.option_strings:
-			parser._optionals._group_actions.remove(item)
-		if noninteractive:
-			for switch in ('--noninteractive', '--noninteractive-full', '--confold', '--confnew', '--confdef', '--confask', '--confmiss'):
-				if switch in item.option_strings:
-					parser._optionals._group_actions.remove(item)
+	If an argument is True it will remove the option.
+	False to keep it.
+	"""
+	action_group = argparser._optionals._group_actions
+	for item in action_group[:]:
+		if (assume_yes and '--assume-yes' in item.option_strings
+		    or download_only and '--download-only' in item.option_strings
+		    or no_update and '--no-update' in item.option_strings
+		    or update and '--update' in item.option_strings
+		    or raw_dpkg and '--raw-dpkg' in item.option_strings):
+			action_group.remove(item)
 
-# Main Parser
-def arg_parse():
+def remove_interactive_options(argparser: NalaParser) -> None:
+	"""Removes the dpkg options from help menu."""
+	action_group = argparser._action_groups
+	for group in action_group[:]:
+		if group.title == 'dpkg options':
+			group._group_actions.clear()
+			group.title = None
+			group.description = None
 
+def arg_parse() -> NalaParser:
+	"""Parses command line arguments."""
 	formatter = lambda prog: argparse.RawDescriptionHelpFormatter(prog, max_help_position=64)
-
 	bin_name = Path(sys.argv[0]).name
-
 	version = __version__
 
 	# Define global options to be given to subparsers
-	global_options = nalaParser(add_help=False)
+	global_options = NalaParser(add_help=False)
 	global_options.add_argument('-y', '--assume-yes', action='store_true', help="assume 'yes' to all prompts and run non-interactively.")
 	global_options.add_argument('-d', '--download-only', action='store_true', help="package files are only retrieved, not unpacked or installed")
 	global_options.add_argument('-v', '--verbose', action='store_true', help='Logs extra information for debugging')
@@ -107,7 +116,7 @@ def arg_parse():
 	global_options.add_argument('--license', action=GPLv3)
 
 	# Define interactive options
-	interactive_options = nalaParser(add_help=False)
+	interactive_options = NalaParser(add_help=False)
 	interactive_options.add_argument('--no-aptlist', action='store_true', help="sets 'APT_LISTCHANGES_FRONTEND=none'. apt-listchanges will not bug you")
 	interactive_options.add_argument('--noninteractive', action='store_true', help="sets 'DEBIAN_FRONTEND=noninteractive'. this also disables apt-listchanges")
 	interactive_options.add_argument('--noninteractive-full', action='store_true', help="an alias for --noninteractive --confdef --confold")
@@ -119,21 +128,16 @@ def arg_parse():
 	interactive_options._action_groups[1].title = 'dpkg options'
 	interactive_options._action_groups[1].description = 'read the man page if you are unsure about these options'
 
-	parser = nalaParser(	formatter_class=formatter,
-							usage=f'{bin_name} [--options] <command>',
-							parents=[global_options, interactive_options]
-							)
-
-	# We need a special iteration to remove the interactive_options from the global --help
-	for group in parser._action_groups[:]:
-		if group.title == 'dpkg options':
-			group._group_actions.clear()
-			group.title = None
-			group.description = None
+	parser = NalaParser(
+		formatter_class=formatter,
+		usage=f'{bin_name} [--options] <command>',
+		parents=[global_options, interactive_options]
+	)
+	remove_interactive_options(parser)
 
 	# Define our subparser
 	subparsers = parser.add_subparsers(metavar='', dest='command')
-
+	assert parser._subparsers
 	# Parser for the install command
 	install_parser = subparsers.add_parser('install',
 		formatter_class=formatter,
@@ -147,7 +151,7 @@ def arg_parse():
 	remove_options(
 		install_parser, assume_yes=False,
 		download_only=False, update=False,
-		no_update=True, raw_dpkg=False, noninteractive=False
+		no_update=True, raw_dpkg=False
 	)
 
 	# Parser for the remove command
@@ -182,7 +186,7 @@ def arg_parse():
 
 	# We specify the options as a parent parser first just so we can easily move them above the global options inside the subparser help.
 	# If there is a better way of doing this please let me know
-	update_options = nalaParser(add_help=False)
+	update_options = NalaParser(add_help=False)
 	update_options.add_argument(
 		'--no-full',
 		action='store_false',
@@ -201,7 +205,7 @@ def arg_parse():
 	remove_options(
 		update_parser, assume_yes=False,
 		download_only=False, update=True,
-		no_update=False, raw_dpkg=False, noninteractive=False
+		no_update=False, raw_dpkg=False
 	)
 
 	upgrade_parser = subparsers.add_parser(
@@ -215,11 +219,11 @@ def arg_parse():
 	remove_options(
 		upgrade_parser, assume_yes=False,
 		download_only=False, update=True,
-		no_update=False, raw_dpkg=False, noninteractive=False
+		no_update=False, raw_dpkg=False
 	)
 
 	# We do the same thing that we did with update options
-	fetch_options = nalaParser(add_help=False)
+	fetch_options = NalaParser(add_help=False)
 	fetch_options.add_argument('--fetches', metavar='number', type=int, default=3, help="number of mirrors to fetch")
 	fetch_options.add_argument('--debian', metavar='sid', help="choose the Debian release")
 	fetch_options.add_argument('--ubuntu', metavar='jammy', help="choose an Ubuntu release")
@@ -240,6 +244,7 @@ def arg_parse():
 	)
 	# Remove Global options that I don't want to see in fetch --help
 	remove_options(fetch_parser)
+	remove_interactive_options(fetch_parser)
 
 	# Parser for the show command
 	show_parser = subparsers.add_parser(
@@ -250,6 +255,7 @@ def arg_parse():
 	)
 	# Remove Global options that I don't want to see in show --help
 	remove_options(show_parser, update=False)
+	remove_interactive_options(show_parser)
 
 	show_parser.add_argument('args', metavar='pkg(s)', nargs='*', help='package(s) to show')
 
@@ -257,13 +263,13 @@ def arg_parse():
 	history_parser = subparsers.add_parser(
 		'history',
 		help='show transaction history',
-		description='history without additional commands lists a history summary',
+		description="'history' without additional arguments will list a history summary",
 		parents=[global_options, interactive_options],
 		usage=f'{bin_name} history [--options] <command> <id|all>'
 	)
-
 	# Remove Global options that I don't want to see in history --help
 	remove_options(history_parser, update=False)
+	remove_interactive_options(history_parser)
 
 	history_parser.add_argument('mode', metavar='info <id>', nargs='?', help='action you would like to do on the history')
 	history_parser.add_argument('id', metavar='undo <id>', nargs='?', help='undo a transaction')

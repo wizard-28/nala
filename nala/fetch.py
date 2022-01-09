@@ -30,7 +30,7 @@ import sys
 import itertools
 from concurrent.futures import ThreadPoolExecutor
 
-import requests
+import requests  # type: ignore[import]
 from apt_pkg import get_architectures
 from aptsources.distro import get_distro
 from pythonping import ping

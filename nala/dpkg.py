@@ -44,7 +44,7 @@ from pexpect.fdpexpect import fdspawn
 from pexpect.utils import poll_ignore_interrupts
 
 from nala.rich import Table, Live, Spinner
-from nala.constants import DPKG_LOG, TERM_SIZE, DPKG_MSG, ERROR_PREFIX
+from nala.constants import DPKG_LOG, TERM_SIZE, DPKG_MSG, ERROR_PREFIX, SPAM
 from nala.utils import color
 
 # Control Codes
@@ -72,7 +72,7 @@ scroll_list: list[Spinner | str] = []
 notice: set[str] = set()
 live = Live(redirect_stdout=False)
 
-class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress):
+class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress): # type: ignore[misc]
 
 	"""Class for getting cache update status and printing to terminal."""
 	def __init__(self, verbose: bool=False, debug: bool=False) -> None:
@@ -104,7 +104,7 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress):
 			self.old_op = self.op
 
 	# OpProgress Method
-	def done(self, _dummy_variable:None = None) -> None: # type: ignore[override]
+	def done(self, _dummy_variable:None = None) -> None:
 		"""Called once an operation has been completed."""
 		base.OpProgress.done(self)
 		if self.verbose:
@@ -168,7 +168,7 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress):
 			return
 		self.write_update('Updated:  ', 'BLUE', item)
 
-	def write_update(self, msg: str, _color: int, item: apt_pkg.AcquireItemDesc) -> None:
+	def write_update(self, msg: str, _color: str, item: apt_pkg.AcquireItemDesc) -> None:
 		"""Writes the update from either hit or fetch."""
 		line = f'{color(msg, _color)} {item.description}'
 		if item.owner.filesize:
@@ -211,7 +211,7 @@ class UpdateProgress(text.TextProgress, base.AcquireProgress, base.OpProgress):
 		signal.signal(signal.SIGWINCH, self._signal)
 		live.stop()
 
-class InstallProgress(base.InstallProgress):
+class InstallProgress(base.InstallProgress): # type: ignore[misc]
 
 	"""Class for getting dpkg status and printing to terminal."""
 	def __init__(self,
@@ -408,7 +408,7 @@ def check_line_spam(line: str, rawline: bytes) -> bool:
 			notice.add(line)
 			return False
 
-	return any(item in line for item in DPKG_MSG['SPAM'])
+	return any(item in line for item in SPAM)
 
 def raw_init() -> None:
 	"""Initialize raw terminal output."""
