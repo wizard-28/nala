@@ -40,7 +40,7 @@ from os import environ, getuid
 from pathlib import Path
 from random import shuffle
 from shutil import copyfileobj
-from typing import NoReturn
+from typing import NoReturn, Pattern
 
 import apt_pkg
 import requests  # type: ignore[import]
@@ -484,12 +484,12 @@ def process_downloads(pkgs: list[Package]) -> bool:
 			link_success = False
 	return link_success
 
-def filter_uris(candidate: Version, mirrors: list[str]) -> list[str]:
+def filter_uris(candidate: Version, mirrors: list[str], pattern: Pattern[str]) -> list[str]:
 	"""Filter uris into usable urls."""
 	urls: list[str] = []
 	for uri in candidate.uris:
 		# Regex to check if we're using mirror.txt
-		regex = re.search('mirror://([A-Za-z_0-9.-]+).*', uri)
+		regex = pattern.search(uri)
 		if regex:
 			domain = regex.group(1)
 			if not mirrors:
@@ -656,10 +656,11 @@ class PkgDownloader:
 			threads = min(guess_concurrent(self.pkgs), 16)
 			with ThreadPoolExecutor(max_workers=threads) as pool:
 				mirrors: list[str] = []
+				pattern = re.compile('mirror://([A-Za-z_0-9.-]+).*')
 				for pkg in self.pkgs:
 					urls: list[str] = []
 					candidate = pkg_candidate(pkg)
-					urls = filter_uris(candidate, mirrors)
+					urls = filter_uris(candidate, mirrors, pattern)
 					# Randomize the urls to minimize load on a single mirror.
 					shuffle(urls)
 					self._start_thread(urls, pool, candidate)
