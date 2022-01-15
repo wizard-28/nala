@@ -29,7 +29,6 @@ from __future__ import annotations
 import errno
 import fnmatch
 import hashlib
-import os
 import re
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -47,13 +46,14 @@ import requests  # type: ignore[import]
 from apt.cache import Cache, FetchFailedException, LockFailedException
 from apt.package import Dependency, Package, Version
 
-from nala.constants import ARCHIVE_DIR, COLUMNS, ERROR_PREFIX, PARTIAL_DIR
+from nala.constants import ARCHIVE_DIR, ERROR_PREFIX, PARTIAL_DIR
 from nala.dpkg import InstallProgress, UpdateProgress
 from nala.history import write_history
 from nala.logger import dprint, iprint, logger_newline
 from nala.options import arguments
 from nala.rich import Live, Table, pkg_download_progress
-from nala.utils import ask, color, print_packages, unit_str, verbose_print
+from nala.utils import (ask, color,
+				print_packages, term, unit_str, verbose_print)
 
 try:
 	USER: str = environ["SUDO_USER"]
@@ -72,7 +72,7 @@ class Nala:
 		"""Manage Nala operations."""
 		# If raw_dpkg is enabled likely they want to see the update too.
 		# Turn off Rich scrolling if we don't have XTERM.
-		if arguments.raw_dpkg or 'xterm' not in os.environ["TERM"]:
+		if arguments.raw_dpkg or not term.is_xterm():
 			arguments.verbose = True
 		# We want to update the cache before we initialize it
 		if not no_update:
@@ -296,6 +296,12 @@ class Nala:
 			self.check_essential(pkgs)
 			delete_names, install_names, upgrade_names = sort_pkg_changes(pkgs)
 			self.print_update_summary(delete_names, install_names, upgrade_names)
+
+			# If we're piped or something the user should specify --assume-yes
+			# As They are aware it can be dangerous to continue
+			if not term.is_term() and not arguments.assume_yes:
+				sys.exit(ERROR_PREFIX+"It can be dangerous to continue without a terminal. Use `--assume-yes`")
+
 			if not arguments.assume_yes and not ask('Do you want to continue'):
 				print("Abort.")
 				return
@@ -383,9 +389,9 @@ class Nala:
 		# I know this looks weird but it's how it has to be
 		width = len(str(max(width_list)))
 
-		print('='*COLUMNS)
+		print('='*term.columns)
 		print('Summary')
-		print('='*COLUMNS)
+		print('='*term.columns)
 		transaction_summary(install_names, width, 'Install')
 		transaction_summary(upgrade_names, width, 'Upgrade')
 		transaction_summary(delete_names, width, delete[0])
