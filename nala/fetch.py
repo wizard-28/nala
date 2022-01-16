@@ -47,14 +47,51 @@ netselect_scored = []
 DEBIAN = 'Debian'
 UBUNTU = 'Ubuntu'
 DOMAIN_PATTERN = re.compile(r'https?://([A-Za-z_0-9.-]+).*')
-ERRNO_PATTERN = re.compile(r'\\[.*\\]')
+ERRNO_PATTERN = re.compile(r'\[.*\]')
 UBUNTU_COUNTRY = re.compile(r'<mirror:countrycode>(.*)</mirror:countrycode>')
 UBUNTU_MIRROR = re.compile(r'<link>(.*)</link>')
 
 def net_select(mirror: str, task: TaskID, live: Live, total: int, num: int) -> None:
 	"""Take a URL, ping the domain and score the latency."""
 	debugger = [f'Thread: {num}', f'Current Mirror: {mirror}']
+	ping_progress(live, task, total, num)
 
+	# Regex to get the domain
+	regex = re.search(DOMAIN_PATTERN, mirror)
+	if not regex:
+		debugger.append('Regex Failed')
+		dprint(debugger)
+		return
+	domain = regex.group(1)
+	debugger.append(f'Pinged: {domain}')
+	try:
+		if not netping(domain, mirror, debugger):
+			return
+	except (socket.gaierror, RuntimeError) as err:
+		ping_error(str(err), domain, mirror)
+
+def netping(domain: str, mirror: str, debugger: list[str]) -> bool:
+	"""Ping the domain and score it."""
+	# We convert the float to integer in order to get rid of the decimal
+	# From there we convert it to a string so we can prefix zeros for sorting
+	res = str(int(ping(domain, count=4, match=True, timeout=1).rtt_avg_ms))
+	debugger.append(f'Ping ms: {res}')
+	if len(res) == 2:
+		res = '0'+res
+	elif len(res) == 1:
+		res = '00'+res
+	elif len(res) > 3:
+		debugger.append('Mirror too slow')
+		dprint(debugger)
+		return False
+
+	debugger.append(f'Appended: {res} {mirror}')
+	dprint(debugger)
+	netselect_scored.append(f'{res} {mirror}')
+	return True
+
+def ping_progress(live: Live, task: TaskID, total: int, num: int) -> None:
+	"""Update fetch progress bar."""
 	if not arguments.debug:
 		table = Table.grid()
 		table.add_row(f"{color('Mirror:', 'GREEN')} {num}/{total}")
@@ -62,41 +99,22 @@ def net_select(mirror: str, task: TaskID, live: Live, total: int, num: int) -> N
 
 		fetch_progress.advance(task)
 		live.update(table)
-	try:
-		# Regex to get the domain
-		regex = re.search(DOMAIN_PATTERN, mirror)
-		if not regex:
-			debugger.append('Regex Failed')
-			dprint(debugger)
-			return
-		domain = regex.group(1)
-		debugger.append(f'Pinged: {domain}')
-		# We convert the float to integer in order to get rid of the decimal
-		# From there we convert it to a string so we can prefix zeros for sorting
-		res = str(int(ping(domain, count=4, match=True, timeout=1).rtt_avg_ms))
-		debugger.append(f'Ping ms: {res}')
-		if len(res) == 2:
-			res = '0'+res
-		elif len(res) == 1:
-			res = '00'+res
-		elif len(res) > 3:
-			debugger.append('Mirror too slow')
-			dprint(debugger)
-			return
 
-		score = f'{res} {mirror}'
-		debugger.append(f'Appended: {score}')
-		dprint(debugger)
-		netselect_scored.append(score)
-
-	except (socket.gaierror, OSError) as ping_err:
-		if arguments.verbose:
-			err = str(ping_err)
-			regex = re.search(ERRNO_PATTERN, err)
-			if regex:
-				err = color(err.replace(regex.group(0), '').strip(), 'YELLOW')
-			print(f'{err}: {domain}')
-			print(f"{color('URL:', 'YELLOW')} {mirror}\n")
+def ping_error(err: str, domain: str, mirror: str) -> None:
+	"""Handle error on ping."""
+	if arguments.verbose:
+		# socket.gaierror: [Errno -2] Name or service not known
+		if 'Errno' in err:
+			print(
+				f"{color(re.sub(ERRNO_PATTERN, '', err), 'YELLOW')}: {domain}",
+				f"{color('URL:', 'YELLOW')} {mirror}\n"
+			)
+			return
+		# 'Cannot resolve address "mirror.telepoint.bg", try verify your DNS or host file'
+		if err.startswith('Cannot resolve'):
+			print(f"{color('Warning:', 'YELLOW')} {str(err).split(',')[0]}")
+			return
+		print(err)
 
 def ubuntu_mirror(country_list: tuple[str, ...] | None) -> tuple[str, ...]:
 	"""Get and parse the Ubuntu mirror list."""
