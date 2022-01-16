@@ -47,6 +47,9 @@ netselect_scored = []
 DEBIAN = 'Debian'
 UBUNTU = 'Ubuntu'
 DOMAIN_PATTERN = re.compile(r'https?://([A-Za-z_0-9.-]+).*')
+ERRNO_PATTERN = re.compile(r'\\[.*\\]')
+UBUNTU_COUNTRY = re.compile(r'<mirror:countrycode>(.*)</mirror:countrycode>')
+UBUNTU_MIRROR = re.compile(r'<link>(.*)</link>')
 
 def net_select(mirror: str, task: TaskID, live: Live, total: int, num: int) -> None:
 	"""Take a URL, ping the domain and score the latency."""
@@ -89,7 +92,7 @@ def net_select(mirror: str, task: TaskID, live: Live, total: int, num: int) -> N
 	except (socket.gaierror, OSError) as ping_err:
 		if arguments.verbose:
 			err = str(ping_err)
-			regex = re.search('\\[.*\\]', err)
+			regex = re.search(ERRNO_PATTERN, err)
 			if regex:
 				err = color(err.replace(regex.group(0), '').strip(), 'YELLOW')
 			print(f'{err}: {domain}')
@@ -176,7 +179,7 @@ def get_countries(master_mirror: tuple[str, ...]) -> tuple[str, ...]:
 			# Ubuntu Countries
 			elif '<mirror:countrycode>' in line:
 				# <mirror:countrycode>US</mirror:countrycode>
-				result = re.search('<mirror:countrycode>(.*)</mirror:countrycode>', line)
+				result = re.search(UBUNTU_COUNTRY, line)
 				if result:
 					country_list.add(result.group(1))
 	return tuple(country_list)
@@ -203,7 +206,7 @@ def ubuntu_parser(mirror: str) -> str | None:
 	for line in mirror.splitlines():
 		if '<link>' in line:
 			# <link>http://mirror.steadfastnet.com/ubuntu/</link>
-			result = re.search('<link>(.*)</link>', line)
+			result = re.search(UBUNTU_MIRROR, line)
 			if result:
 				return result.group(1)
 	return None
