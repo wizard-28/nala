@@ -46,6 +46,7 @@ netselect_scored = []
 
 DEBIAN = 'Debian'
 UBUNTU = 'Ubuntu'
+DOMAIN_PATTERN = re.compile(r'https?://([A-Za-z_0-9.-]+).*')
 
 def net_select(mirror: str, task: TaskID, live: Live, total: int, num: int) -> None:
 	"""Take a URL, ping the domain and score the latency."""
@@ -60,7 +61,7 @@ def net_select(mirror: str, task: TaskID, live: Live, total: int, num: int) -> N
 		live.update(table)
 	try:
 		# Regex to get the domain
-		regex = re.search('https?://([A-Za-z_0-9.-]+).*', mirror)
+		regex = re.search(DOMAIN_PATTERN, mirror)
 		if not regex:
 			debugger.append('Regex Failed')
 			dprint(debugger)
