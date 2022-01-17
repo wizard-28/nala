@@ -44,7 +44,7 @@ import requests  # type: ignore[import]
 from apt.cache import Cache, FetchFailedException, LockFailedException
 from apt.package import Package, Version
 
-from nala.constants import ARCHIVE_DIR, ERROR_PREFIX, PARTIAL_DIR
+from nala.constants import ARCHIVE_DIR, ERROR_PREFIX, NALA_DIR, PARTIAL_DIR
 from nala.dpkg import InstallProgress, UpdateProgress
 from nala.history import write_history, write_log
 from nala.logger import dprint
@@ -54,8 +54,6 @@ from nala.show import check_virtual, show_main
 from nala.utils import (ask, color, pkg_candidate, pkg_installed,
 				print_packages, term, unit_str, verbose_print)
 
-NALA_DIR = Path('/var/lib/nala')
-NALA_HISTORY = Path('/var/lib/nala/history')
 
 class Nala:
 	"""Manage Nala operations."""
