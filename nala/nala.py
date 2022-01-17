@@ -60,6 +60,7 @@ class Nala:
 
 	def __init__(self,	no_update: bool = False) -> None:
 		"""Manage Nala operations."""
+		self.purge = False
 		self.deleted: list[list[str]] = []
 		self.autoremoved: list[list[str]] = []
 		# If raw_dpkg is enabled likely they want to see the update too.
@@ -77,12 +78,6 @@ class Nala:
 			self.cache = Cache(UpdateProgress())
 		except (LockFailedException, FetchFailedException) as err:
 			apt_error(err)
-
-		self.purge = False
-		self.archive_dir = Path(apt_pkg.config.find_dir('Dir::Cache::Archives'))
-		"""/var/cache/apt/archives/"""
-		if not self.archive_dir:
-			sys.exit(ERROR_PREFIX+'No archive dir is set. Usually it is /var/cache/apt/archives/')
 
 	def upgrade(self, dist_upgrade: bool = False) -> None:
 		"""Upgrade pkg[s]."""
