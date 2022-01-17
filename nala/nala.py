@@ -223,9 +223,6 @@ class Nala:
 				print("Abort.")
 				return
 
-			write_history(delete_names, install_names, upgrade_names)
-			write_log(delete_names, install_names, upgrade_names, autoremove_names)
-
 			pkgs = [
 				# Don't download packages that already exist
 				pkg for pkg in pkgs if not pkg.marked_delete and not check_pkg(ARCHIVE_DIR, pkg)
@@ -237,6 +234,8 @@ class Nala:
 		if arguments.download_only:
 			print("Download complete and in download only mode.")
 		else:
+			write_history(delete_names, install_names, upgrade_names)
+			write_log(delete_names, install_names, upgrade_names, autoremove_names)
 			self.start_dpkg()
 
 	def start_dpkg(self) -> None:

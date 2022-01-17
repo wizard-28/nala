@@ -194,8 +194,6 @@ def write_history(delete_names: list[list[str]],
 	install_names: list[list[str]], upgrade_names: list[list[str]]) -> None:
 	"""Prepare history for writing."""
 	# We don't need only downloads in the history
-	if '--download-only' in sys.argv[1:]:
-		return
 	timezone = datetime.utcnow().astimezone().tzinfo
 	time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')+' '+str(timezone)
 	history_dict = load_history_file() if NALA_HISTORY.exists() else {}
