@@ -186,36 +186,19 @@ class Nala:
 
 	def get_changes(self, upgrade: bool = False, remove: bool = False) -> None:
 		"""Get packages requiring changes and process them."""
-		def pkg_name(pkg: Package) -> str:
-			"""Sort by package name."""
-			return str(pkg.name)
 
 		pkgs = sorted(self.cache.get_changes(), key=pkg_name)
 		if not NALA_DIR.exists():
 			NALA_DIR.mkdir()
 
-		if upgrade and not pkgs:
-			print(color("All packages are up to date."))
-			sys.exit(0)
-		elif not remove and not pkgs:
-			print(color("Nothing for Nala to do."))
-			sys.exit(0)
-		elif remove and not pkgs:
-			print(color("Nothing for Nala to remove."))
-			sys.exit(0)
+		check_work(pkgs, upgrade, remove)
+
 		if pkgs:
 			check_essential(pkgs)
 			delete_names, install_names, upgrade_names, autoremove_names = self.sort_pkg_changes(pkgs)
 			self.print_update_summary(delete_names, install_names, upgrade_names, autoremove_names)
 
-			# If we're piped or something the user should specify --assume-yes
-			# As They are aware it can be dangerous to continue
-			if not term.is_term() and not arguments.assume_yes:
-				sys.exit(ERROR_PREFIX+"It can be dangerous to continue without a terminal. Use `--assume-yes`")
-
-			if not arguments.assume_yes and not ask('Do you want to continue'):
-				print("Abort.")
-				return
+			check_term_ask()
 
 			pkgs = [
 				# Don't download packages that already exist
@@ -357,6 +340,39 @@ class Nala:
 			print(f'Disk space required: {unit_str(self.cache.required_space)}')
 		if arguments.download_only:
 			print("Nala will only download the packages")
+
+def pkg_name(pkg: Package) -> str:
+	"""Sort by package name.
+
+	This is to be used as sorted(key=pkg_name)
+	"""
+	return str(pkg.name)
+
+def check_term_ask() -> None:
+	"""Check terminal and ask user if they want to continue"""
+	# If we're piped or something the user should specify --assume-yes
+	# As They are aware it can be dangerous to continue
+	if not term.is_term() and not arguments.assume_yes:
+		sys.exit(ERROR_PREFIX+"It can be dangerous to continue without a terminal. Use `--assume-yes`")
+
+	if not arguments.assume_yes and not ask('Do you want to continue'):
+		print("Abort.")
+		sys.exit(0)
+
+def check_work(pkgs: list[Package], upgrade: bool, remove: bool) -> None:
+	"""Check if there is any work for nala to do.
+
+	Returns None if there is work, exit's successful if not.
+	"""
+	if upgrade and not pkgs:
+		print(color("All packages are up to date."))
+		sys.exit(0)
+	elif not remove and not pkgs:
+		print(color("Nothing for Nala to do."))
+		sys.exit(0)
+	elif remove and not pkgs:
+		print(color("Nothing for Nala to remove."))
+		sys.exit(0)
 
 def check_found(cache: Cache, pkg_name: str,
 	not_found: list[str], not_installed: list[str]) -> bool:
