@@ -269,7 +269,7 @@ class Nala:
 		except apt_pkg.Error as err:
 			sys.exit(f'\r\n{ERROR_PREFIX+str(err)}')
 
-	def sort_pkg_changes(self, pkgs: list[Package], log: bool = False
+	def sort_pkg_changes(self, pkgs: list[Package]
 		) -> tuple[list[list[str]], list[list[str]], list[list[str]], list[list[str]]]:
 		"""Sort a list of packages and splits them based on the action to take."""
 		delete_names: list[list[str]] = []
