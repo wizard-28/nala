@@ -33,7 +33,6 @@ import re
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from datetime import datetime
 from os import environ
 from pathlib import Path
 from random import shuffle
