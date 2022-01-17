@@ -229,57 +229,35 @@ def ubuntu_parser(mirror: str) -> str | None:
 				return result.group(1)
 	return None
 
-def detect_release() -> tuple[str | None, ...]:
+def detect_release() -> tuple[str, str]:
 	"""Detect the distro and release."""
-	try:
-		lsb = get_distro()
-		distro = lsb.id
-		release = lsb.codename
-	# I'm not sure if this can fail but if it does we can't really continue.
-	except Exception as err: # pylint: disable=broad-except
-		print(err)
-		print(ERROR_PREFIX+'Unable to detect release. Specify manually')
-		parser.parse_args(['fetch', '--help'])
-		sys.exit(1)
-
-	if distro and release:
-		return distro, release
-	return None, None
-
-def fetch() -> None:
-	"""Fetch fast mirrors and write nala-sources.list."""
-	if (NALA_SOURCES.exists() and not arguments.assume_yes and
-	    not ask(f'{NALA_SOURCES.name} already exists.\ncontinue and overwrite it')
-	    ):
-		sys.exit('Abort')
-
-	# Make sure there aren't any shenanigans
-	if arguments.fetches not in range(1,11):
-		sys.exit('Amount of fetches has to be 1-10...')
-
-	# If supplied a country it needs to be a list
-	country_list = (arguments.country,) if arguments.country else None
-
 	if not arguments.debian and not arguments.ubuntu:
-		distro, release = detect_release()
-	elif arguments.debian:
-		distro = DEBIAN
-		release = arguments.debian
-	else:
-		distro = UBUNTU
-		release = arguments.ubuntu
+		lsb = get_distro()
+		return lsb.id, lsb.codename
 
-	if distro == DEBIAN:
-		netselect = debian_mirror(country_list)
-		component = 'main' if arguments.foss else 'main contrib non-free'
-	else:
-		netselect = ubuntu_mirror(country_list)
-		# It's ubuntu, you probably don't care about foss
-		component = 'main restricted universe multiverse'
+	if arguments.debian:
+		return DEBIAN, arguments.debian
+	return UBUNTU, arguments.ubuntu
 
-	dprint(netselect)
-	dprint(f'Distro: {distro}, Release: {release}, Component: {component}')
+def write_sources(release: str, component: str) -> None:
+	"""Write mirrors to nala-sources.list."""
+	with open(NALA_SOURCES, 'w', encoding="utf-8") as file:
+		print(f"{color('Writing:', 'GREEN')} {NALA_SOURCES}\n")
+		print('# Sources file built for nala\n', file=file)
+		arguments.fetches -= 1
+		for num, line in enumerate(netselect_scored):
+			# This splits off the score '030 http://mirror.steadfast.net/debian/'
+			line = line[line.index('h'):]
+			source = f'{line} {release} {component}'
+			print(f'deb {source}')
+			print(f'deb-src {source}\n')
+			print(f'deb {source}', file=file)
+			print(f'deb-src {source}\n', file=file)
+			if num == arguments.fetches:
+				break
 
+def test_mirrors(netselect: tuple[str, ...]) -> None:
+	"""Test mirrors."""
 	print('Testing mirrors...')
 	with Live(transient=True) as live:
 		with ThreadPoolExecutor(max_workers=32) as pool:
@@ -289,23 +267,55 @@ def fetch() -> None:
 			for num, mirror in enumerate(netselect):
 				pool.submit(net_select, mirror, task, live, total, num)
 
+def check_supported(distro:str, release:str,
+	country_list: tuple[str, ...] | None) -> tuple[tuple[str, ...], str]:
+	"""Check if the distro is supported or not.
+
+	If the distro is supported return mirror list and component.
+
+	Error if the distro is not supported.
+	"""
+	if distro == DEBIAN:
+		component = 'main' if arguments.foss else 'main contrib non-free'
+		return debian_mirror(country_list), component
+	if distro == UBUNTU:
+		# It's ubuntu, you probably don't care about foss
+		return ubuntu_mirror(country_list), 'main restricted universe multiverse'
+	parser.parse_args(['fetch', '--help'])
+	print(
+		ERROR_PREFIX+f"{distro} {release} is unsupported.\n"
+		"You can specify Ubuntu or Debian manually."
+	)
+	sys.exit(ERROR_PREFIX+f"{distro} {release} is unsupported.")
+
+def fetch_checks() -> None:
+	"""Perform checks and error if we shouldn't continue."""
+	if (NALA_SOURCES.exists() and not arguments.assume_yes and
+	    not ask(f'{NALA_SOURCES.name} already exists.\ncontinue and overwrite it')
+	    ):
+		sys.exit('Abort')
+	# Make sure there aren't any shenanigans
+	if arguments.fetches not in range(1,11):
+		sys.exit('Amount of fetches has to be 1-10...')
+
+def fetch() -> None:
+	"""Fetch fast mirrors and write nala-sources.list."""
+	fetch_checks()
+
+	# If supplied a country it needs to be a list
+	country_list = (arguments.country,) if arguments.country else None
+
+	distro, release = detect_release()
+	netselect, component = check_supported(distro, release, country_list)
+
+	dprint(netselect)
+	dprint(f'Distro: {distro}, Release: {release}, Component: {component}')
+
+	test_mirrors(netselect)
 	netselect_scored.sort()
 
 	dprint(netselect_scored)
 	dprint(f'Size of original list: {len(netselect)}')
 	dprint(f'Size of scored list: {len(netselect_scored)}')
 	dprint(f'Writing from: {netselect_scored[:arguments.fetches]}')
-
-	with open(NALA_SOURCES, 'w', encoding="utf-8") as file:
-		print(f"{color('Writing:', 'GREEN')} {NALA_SOURCES}\n")
-		print('# Sources file built for nala\n', file=file)
-		arguments.fetches -= 1
-		for num, line in enumerate(netselect_scored):
-			# This splits off the score '030 http://mirror.steadfast.net/debian/'
-			line = line[line.index('h'):]
-			print(f'deb {line} {release} {component}')
-			print(f'deb-src {line} {release} {component}\n')
-			print(f'deb {line} {release} {component}', file=file)
-			print(f'deb-src {line} {release} {component}\n', file=file)
-			if num == arguments.fetches:
-				break
+	write_sources(release, component)
