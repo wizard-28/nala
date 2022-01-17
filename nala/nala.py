@@ -143,8 +143,8 @@ class Nala:
 	def remove(self, pkg_names: list[str], purge: bool = False) -> None:
 		"""Remove or Purge pkg[s]."""
 		dprint(f"Remove pkg_names: {pkg_names}")
-		not_found = []
-		not_installed = []
+		not_found: list[str] = []
+		not_installed: list[str] = []
 		self.purge = purge
 
 		# We only want to glob if we detect an *
