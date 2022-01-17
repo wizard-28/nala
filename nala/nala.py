@@ -312,22 +312,9 @@ class Nala:
 			'bold blue'
 		)
 
-		# We need to get our width for formatting
-		width_list = [
-			len(delete_names),
-			len(install_names),
-			len(upgrade_names)
-		]
-
-		# I know this looks weird but it's how it has to be
-		width = len(str(max(width_list)))
-
-		print('='*term.columns)
-		print('Summary')
-		print('='*term.columns)
-		transaction_summary(install_names, width, 'Install')
-		transaction_summary(upgrade_names, width, 'Upgrade')
-		transaction_summary(delete_names, width, delete[0])
+		transaction_summary(delete[0],
+			len(delete_names), len(install_names),
+			len(upgrade_names), len(autoremove_names))
 
 		if self.cache.required_download > 0:
 			print(f'\nTotal download size: {unit_str(self.cache.required_download)}')
@@ -517,16 +504,26 @@ def guess_concurrent(pkgs: list[Package]) -> int:
 		max_uris = max(len(candidate.uris)*2, max_uris)
 	return max_uris
 
-def transaction_summary(names: list[list[str]], width: int, header: str) -> None:
+def transaction_summary(delete_header: str,
+	delete_total: int, install_total: int,
+	upgrade_total: int, autoremove_total: int) -> None:
 	"""Print a small transaction summary."""
-	# We should look at making this more readable
-	# Or integrating it somewhere else
-	if names:
-		print(
-			header.ljust(7),
-			f'{len(names)}'.rjust(width),
-			'Packages'
-			)
+	print('='*term.columns)
+	print('Summary')
+	print('='*term.columns)
+	table = Table.grid('', padding=(0,2))
+	table.add_column(justify='right')
+	table.add_column()
+
+	if install_total:
+		table.add_row('Install', str(install_total), 'Packages')
+	if upgrade_total:
+		table.add_row('Upgrade', str(upgrade_total), 'Packages')
+	if delete_total:
+		table.add_row(delete_header, str(delete_total), 'Packages')
+	if autoremove_total:
+		table.add_row('Auto-Remove', str(autoremove_total), 'Packages')
+	term.console.print(table)
 
 def apt_error(apt_err: FetchFailedException | LockFailedException) -> NoReturn:
 	"""Take an error message from python-apt and formats it."""

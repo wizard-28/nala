@@ -73,6 +73,7 @@ class Terminal:
 		self.size = get_terminal_size()
 		self.columns = self.size.columns
 		self.lines = self.size.lines
+		self.console = console
 		self.term: bool = True
 		self.mode: list[int | list[bytes | int]] = []
 		self.term_type: str = os.environ.get('TERM', '')
