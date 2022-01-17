@@ -34,8 +34,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
-from getpass import getuser
-from os import environ, getuid
+from os import environ
 from pathlib import Path
 from random import shuffle
 from shutil import copyfileobj
@@ -48,20 +47,13 @@ from apt.package import Package, Version
 
 from nala.constants import ARCHIVE_DIR, ERROR_PREFIX, PARTIAL_DIR
 from nala.dpkg import InstallProgress, UpdateProgress
-from nala.history import write_history
-from nala.logger import dprint, iprint, logger_newline
+from nala.history import write_history, write_log
+from nala.logger import dprint
 from nala.options import arguments
 from nala.rich import Live, Table, pkg_download_progress
 from nala.show import check_virtual, show_main
 from nala.utils import (ask, color, pkg_candidate, pkg_installed,
 				print_packages, term, unit_str, verbose_print)
-
-try:
-	USER: str = environ["SUDO_USER"]
-	UID: str | int = environ["SUDO_UID"]
-except KeyError:
-	USER = getuser()
-	UID = getuid()
 
 NALA_DIR = Path('/var/lib/nala')
 NALA_HISTORY = Path('/var/lib/nala/history')
@@ -71,6 +63,8 @@ class Nala:
 
 	def __init__(self,	no_update: bool = False) -> None:
 		"""Manage Nala operations."""
+		self.deleted: list[list[str]] = []
+		self.autoremoved: list[list[str]] = []
 		# If raw_dpkg is enabled likely they want to see the update too.
 		# Turn off Rich scrolling if we don't have XTERM.
 		if arguments.raw_dpkg or not term.is_xterm():
@@ -169,6 +163,8 @@ class Nala:
 				continue
 
 			pkg.mark_delete(purge=purge)
+			# Add name to deleted for autoremove checking.
+			self.deleted.append(pkg.name)
 			dprint(f"Marked delete: {pkg.name}")
 
 		if not_installed:
@@ -193,20 +189,13 @@ class Nala:
 
 	def auto_remover(self) -> None:
 		"""Handle auto removal of packages."""
-		autoremove = []
-
 		for pkg in self.cache:
 			# We have to check both of these. Sometimes weird things happen
-			if pkg.is_installed and pkg.is_auto_removable:
+			if pkg.is_installed and pkg.is_auto_removable and pkg.name not in self.deleted:
 				pkg.mark_delete(purge=self.purge)
-				installed = pkg_installed(pkg)
-				autoremove.append(
-					f"<Package: '{pkg.name}' "
-					f"Arch: '{installed.architecture}' "
-					f"Version: '{installed.version}'"
-					)
+				self.autoremoved.append(pkg.name)
 
-		dprint(f"Pkgs marked by autoremove: {autoremove}")
+		dprint(f"Pkgs marked by autoremove: {self.autoremoved}")
 
 	def get_changes(self, upgrade: bool = False, remove: bool = False) -> None:
 		"""Get packages requiring changes and process them."""
@@ -229,8 +218,8 @@ class Nala:
 			sys.exit(0)
 		if pkgs:
 			check_essential(pkgs)
-			delete_names, install_names, upgrade_names = sort_pkg_changes(pkgs)
-			self.print_update_summary(delete_names, install_names, upgrade_names)
+			delete_names, install_names, upgrade_names, autoremove_names = self.sort_pkg_changes(pkgs)
+			self.print_update_summary(delete_names, install_names, upgrade_names, autoremove_names)
 
 			# If we're piped or something the user should specify --assume-yes
 			# As They are aware it can be dangerous to continue
@@ -242,7 +231,7 @@ class Nala:
 				return
 
 			write_history(delete_names, install_names, upgrade_names)
-			write_log(pkgs)
+			write_log(delete_names, install_names, upgrade_names, autoremove_names)
 
 			pkgs = [
 				# Don't download packages that already exist
@@ -287,9 +276,42 @@ class Nala:
 		except apt_pkg.Error as err:
 			sys.exit(f'\r\n{ERROR_PREFIX+str(err)}')
 
+	def sort_pkg_changes(self, pkgs: list[Package], log: bool = False
+		) -> tuple[list[list[str]], list[list[str]], list[list[str]], list[list[str]]]:
+		"""Sort a list of packages and splits them based on the action to take."""
+		delete_names: list[list[str]] = []
+		install_names: list[list[str]] = []
+		upgrade_names: list[list[str]] = []
+		autoremove_names: list[list[str]] = []
+
+		for pkg in pkgs:
+			candidate = pkg_candidate(pkg)
+			if pkg.marked_delete:
+				installed = pkg_installed(pkg)
+				if pkg.name not in self.autoremoved:
+					delete_names.append(
+						[pkg.name, installed.version, str(installed.size)]
+					)
+				else:
+					autoremove_names.append(
+						[pkg.name, installed.version, str(installed.size)]
+					)
+
+			elif pkg.marked_install:
+				install_names.append(
+					[pkg.name, candidate.version, str(candidate.size)]
+				)
+
+			elif pkg.marked_upgrade:
+				installed = pkg_installed(pkg)
+				upgrade_names.append(
+					[pkg.name, installed.version, candidate.version, str(candidate.size)]
+				)
+		return delete_names, install_names, upgrade_names, autoremove_names
+
 	def print_update_summary(self,
-			delete_names: list[list[str]],
-			install_names: list[list[str]], upgrade_names: list[list[str]]) -> None:
+			delete_names: list[list[str]], install_names: list[list[str]],
+			upgrade_names: list[list[str]], autoremove_names:list[list[str]]) -> None:
 		"""Print our transaction summary."""
 		delete = ('Purge', 'Purging:') if self.purge else ('Remove', 'Removing:')
 
@@ -297,6 +319,13 @@ class Nala:
 			['Package:', 'Version:', 'Size:'],
 			deepcopy(delete_names),
 			delete[1],
+			'bold red'
+		)
+
+		print_packages(
+			['Package:', 'Version:', 'Size:'],
+			deepcopy(autoremove_names),
+			'Auto-Removing:',
 			'bold red'
 		)
 
@@ -480,60 +509,6 @@ def transaction_summary(names: list[list[str]], width: int, header: str) -> None
 			f'{len(names)}'.rjust(width),
 			'Packages'
 			)
-
-def sort_pkg_changes(pkgs: list[Package], log: bool = False
-	) -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
-	"""Sort a list of packages and splits them based on the action to take."""
-	delete_names: list[list[str]] = []
-	install_names: list[list[str]] = []
-	upgrade_names: list[list[str]] = []
-
-	for pkg in pkgs:
-		candidate = pkg_candidate(pkg)
-		if pkg.marked_delete:
-			installed = pkg_installed(pkg)
-			if log:
-				delete_names.append([f"{pkg.name}:{installed.architecture} ({installed.version})"])
-				continue
-			delete_names.append(
-				[pkg.name, installed.version, str(candidate.size)]
-			)
-
-		elif pkg.marked_install:
-			if log:
-				install_names.append([f"{pkg.name}:{candidate.architecture} ({candidate.version})"])
-				continue
-			install_names.append(
-				[pkg.name, candidate.version, str(candidate.size)]
-			)
-
-		elif pkg.marked_upgrade:
-			installed = pkg_installed(pkg)
-			if log:
-				upgrade_names.append([f"{pkg.name}:{candidate.architecture} ({candidate.version})"])
-			upgrade_names.append(
-				[pkg.name, installed.version, candidate.version, str(candidate.size)]
-			)
-	return delete_names, install_names, upgrade_names
-
-def write_log(pkgs: list[Package]) -> None:
-	"""Write information to the log file."""
-	delete_names, install_names, upgrade_names = sort_pkg_changes(pkgs, log=True)
-
-	timezone = datetime.utcnow().astimezone().tzinfo
-	time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')+' '+str(timezone)
-	# Just logfile things
-	iprint(f'Date: {time}')
-	iprint(f'Requested-By: {USER} ({UID})')
-
-	if delete_names:
-		iprint(f'Removed: {", ".join(delete_names[0])}')
-	if install_names:
-		iprint(f'Installed: {", ".join(install_names[0])}')
-	if upgrade_names:
-		iprint(f'Upgraded: {", ".join(upgrade_names[0])}')
-
-	logger_newline()
 
 def apt_error(apt_err: FetchFailedException | LockFailedException) -> NoReturn:
 	"""Take an error message from python-apt and formats it."""
