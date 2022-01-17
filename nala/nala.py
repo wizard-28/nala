@@ -182,13 +182,14 @@ class Nala:
 
 	def auto_remover(self) -> None:
 		"""Handle auto removal of packages."""
-		for pkg in self.cache:
-			# We have to check both of these. Sometimes weird things happen
-			if pkg.is_installed and pkg.is_auto_removable and pkg.name not in self.deleted:
-				pkg.mark_delete(purge=self.purge)
-				self.autoremoved.append(pkg.name)
+		if not arguments.no_autoremove:
+			for pkg in self.cache:
+				# We have to check both of these. Sometimes weird things happen
+				if pkg.is_installed and pkg.is_auto_removable and pkg.name not in self.deleted:
+					pkg.mark_delete(purge=self.purge)
+					self.autoremoved.append(pkg.name)
 
-		dprint(f"Pkgs marked by autoremove: {self.autoremoved}")
+			dprint(f"Pkgs marked by autoremove: {self.autoremoved}")
 
 	def get_changes(self, upgrade: bool = False, remove: bool = False) -> None:
 		"""Get packages requiring changes and process them."""
