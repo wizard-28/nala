@@ -286,41 +286,33 @@ class Nala:
 
 		print_packages(
 			['Package:', 'Version:', 'Size:'],
-			deepcopy(delete_names),
-			delete[1],
-			'bold red'
+			deepcopy(delete_names), delete[1], 'bold red'
 		)
 
 		print_packages(
 			['Package:', 'Version:', 'Size:'],
-			deepcopy(autoremove_names),
-			'Auto-Removing:',
-			'bold red'
+			deepcopy(autoremove_names), 'Auto-Removing:', 'bold red'
 		)
 
 		print_packages(
 			['Package:', 'Version:', 'Size:'],
-			deepcopy(install_names),
-			'Installing:',
-			'bold green'
+			deepcopy(install_names), 'Installing:', 'bold green'
 		)
 
 		print_packages(
 			['Package:', 'Old Version:', 'New Version:', 'Size:'],
-			deepcopy(upgrade_names),
-			'Upgrading:',
-			'bold blue'
+			deepcopy(upgrade_names), 'Upgrading:', 'bold blue'
 		)
 
 		transaction_summary(delete[0],
 			len(delete_names), len(install_names),
 			len(upgrade_names), len(autoremove_names))
+		self.transaction_footer()
 
+	def transaction_footer(self) -> None:
+		print()
 		if self.cache.required_download > 0:
-			print(f'\nTotal download size: {unit_str(self.cache.required_download)}')
-		else:
-			# We need this extra line lol
-			print()
+			print(f'Total download size: {unit_str(self.cache.required_download)}')
 		if self.cache.required_space < 0:
 			print(f'Disk space to free: {unit_str(-int(self.cache.required_space))}')
 		else:
