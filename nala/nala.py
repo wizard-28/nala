@@ -153,19 +153,13 @@ class Nala:
 			pkg_names = self.glob_filter(pkg_names)
 
 		for pkg_name in pkg_names:
-			if pkg_name not in self.cache:
-				not_found.append(pkg_name)
-				continue
+			if check_found(self.cache, pkg_name, not_found, not_installed):
 
-			pkg = self.cache[pkg_name]
-			if not pkg.installed:
-				not_installed.append(pkg_name)
-				continue
-
-			pkg.mark_delete(purge=purge)
-			# Add name to deleted for autoremove checking.
-			self.deleted.append(pkg.name)
-			dprint(f"Marked delete: {pkg.name}")
+				pkg = self.cache[pkg_name]
+				pkg.mark_delete(purge=self.purge)
+				# Add name to deleted for autoremove checking.
+				self.deleted.append(pkg.name)
+		dprint(f"Marked delete: {self.deleted}")
 
 		if not_installed:
 			pkg_error(not_installed, 'not installed')
@@ -371,6 +365,22 @@ class Nala:
 			print(f'Disk space required: {unit_str(self.cache.required_space)}')
 		if arguments.download_only:
 			print("Nala will only download the packages")
+
+def check_found(cache: Cache, pkg_name: str,
+	not_found: list[str], not_installed: list[str]) -> bool:
+	"""Check if package is in the cache or installed.
+
+	Return True if the package is found.
+	"""
+	if pkg_name not in cache:
+		not_found.append(pkg_name)
+		return False
+
+	pkg = cache[pkg_name]
+	if not pkg.installed:
+		not_installed.append(pkg_name)
+		return False
+	return True
 
 def check_essential(pkgs: list[Package]) -> None:
 	"""Check removal of essential packages."""
