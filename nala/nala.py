@@ -187,7 +187,7 @@ class Nala:
 	def get_changes(self, upgrade: bool = False, remove: bool = False) -> None:
 		"""Get packages requiring changes and process them."""
 
-		pkgs = sorted(self.cache.get_changes(), key=pkg_name)
+		pkgs = sorted(self.cache.get_changes(), key=sort_pkg_name)
 		if not NALA_DIR.exists():
 			NALA_DIR.mkdir()
 
@@ -317,7 +317,7 @@ class Nala:
 		if arguments.download_only:
 			print("Nala will only download the packages")
 
-def pkg_name(pkg: Package) -> str:
+def sort_pkg_name(pkg: Package) -> str:
 	"""Sort by package name.
 
 	This is to be used as sorted(key=pkg_name)
