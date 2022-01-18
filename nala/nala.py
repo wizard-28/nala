@@ -186,7 +186,6 @@ class Nala:
 
 	def get_changes(self, upgrade: bool = False, remove: bool = False) -> None:
 		"""Get packages requiring changes and process them."""
-
 		pkgs = sorted(self.cache.get_changes(), key=sort_pkg_name)
 		if not NALA_DIR.exists():
 			NALA_DIR.mkdir()
@@ -307,6 +306,7 @@ class Nala:
 		self.transaction_footer()
 
 	def transaction_footer(self) -> None:
+		"""Print transaction footer."""
 		print()
 		if self.cache.required_download > 0:
 			print(f'Total download size: {unit_str(self.cache.required_download)}')
@@ -320,12 +320,12 @@ class Nala:
 def sort_pkg_name(pkg: Package) -> str:
 	"""Sort by package name.
 
-	This is to be used as sorted(key=pkg_name)
+	This is to be used as sorted(key=sort_pkg_name)
 	"""
 	return str(pkg.name)
 
 def check_term_ask() -> None:
-	"""Check terminal and ask user if they want to continue"""
+	"""Check terminal and ask user if they want to continue."""
 	# If we're piped or something the user should specify --assume-yes
 	# As They are aware it can be dangerous to continue
 	if not term.is_term() and not arguments.assume_yes:
