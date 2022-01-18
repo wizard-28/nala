@@ -238,10 +238,7 @@ class Nala:
 			apt_pkg.config.set('Dpkg::Options::', '--force-confask')
 
 		try:
-			self.cache.commit(
-				UpdateProgress(),
-				InstallProgress()
-			)
+			self.cache.commit(UpdateProgress(), InstallProgress())
 		except apt_pkg.Error as err:
 			sys.exit(f'\r\n{ERROR_PREFIX+str(err)}')
 
