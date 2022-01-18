@@ -41,19 +41,21 @@ import apt_pkg
 from apt.progress import base, text
 from pexpect.fdpexpect import fdspawn
 from pexpect.utils import poll_ignore_interrupts
+from rich.progress import TaskID
+from rich.ansi import AnsiDecoder
 
 from nala.constants import DPKG_LOG, DPKG_MSG, ERROR_PREFIX, SPAM
 from nala.options import arguments
-from nala.rich import Live, Spinner, Table, Text
+from nala.rich import Live, Spinner, Table, Text, dpkg_progress
 from nala.utils import color, term
 
 VERSION_PATTERN = re.compile(r'\(.*?\)')
 PARENTHESIS_PATTERN = re.compile(r'[()]')
 
 spinner = Spinner('dots', text='Initializing', style="bold blue")
-scroll_list: list[Spinner | str] = []
+#scroll_list: list[Spinner | str] = []
 notice: set[str] = set()
-live = Live(redirect_stdout=False)
+live = Live()
 
 class UpdateProgress(text.AcquireProgress, base.OpProgress): # type: ignore[misc]
 	"""Class for getting cache update status and printing to terminal."""
@@ -67,12 +69,13 @@ class UpdateProgress(text.AcquireProgress, base.OpProgress): # type: ignore[misc
 		self._id = 1
 		self._width = 80
 		self.old_op = "" # OpProgress setting
+		self.scroll_list: list[Spinner | str]
 		if arguments.debug:
 			arguments.verbose=True
 
 		spinner.text = Text('Initializing Cache')
-		scroll_list.clear()
-		scroll_list.append(spinner)
+		# scroll_list.clear()
+		# scroll_list.append(spinner)
 
 	# OpProgress Method
 	def update(self, percent: float | None = None) -> None:
@@ -111,7 +114,7 @@ class UpdateProgress(text.AcquireProgress, base.OpProgress): # type: ignore[misc
 		else:
 			for item in ['Updated:', 'Ignored:', 'Error:', 'No Change:']:
 				if item in msg:
-					scroll_bar(msg)
+					scroll_bar(self, msg)
 					break
 			else:
 				# For the pulse messages we need to do some formatting
@@ -126,7 +129,7 @@ class UpdateProgress(text.AcquireProgress, base.OpProgress): # type: ignore[misc
 					msg = ' '.join(pulse)
 
 				spinner.text = Text(msg)
-				scroll_bar(msg=None)
+				scroll_bar(self, msg=None, update=True)
 
 	def ims_hit(self, item: apt_pkg.AcquireItemDesc) -> None:
 		"""Call when an item is update (e.g. not modified on the server)."""
@@ -172,6 +175,7 @@ class UpdateProgress(text.AcquireProgress, base.OpProgress): # type: ignore[misc
 		window resize signals. And it also sets id to 1.
 		"""
 		base.AcquireProgress.start(self)
+		self.scroll_list: list[Spinner | str] = [spinner]
 		self._signal = signal.signal(signal.SIGWINCH, self._winch) # type: ignore[assignment]
 		# Get the window size.
 		self._winch()
@@ -195,7 +199,7 @@ class UpdateProgress(text.AcquireProgress, base.OpProgress): # type: ignore[misc
 class InstallProgress(base.InstallProgress): # type: ignore[misc]
 	"""Class for getting dpkg status and printing to terminal."""
 
-	def __init__(self) -> None:
+	def __init__(self, pkg_total: int) -> None:
 		"""Class for getting dpkg status and printing to terminal."""
 		base.InstallProgress.__init__(self)
 		self.raw = False
@@ -204,6 +208,14 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc]
 		self.child: AptExpect
 		self.child_fd: int
 		self.child_pid: int
+		self.pkg_total = pkg_total
+		self.scroll_list: list[Spinner | str]
+		self.scroll_list: list[Spinner | str] = []
+		self.task: TaskID
+		# If we're running one of these we need to double the operations to include both
+		# 'unpacking:' and 'Setting up:' or else it's hard to get accurate progress
+		if arguments.command in ('install', 'update', 'upgrade'):
+			self.pkg_total *= 2
 		# If we detect we're piped it's probably best to go raw.
 		if not term.is_term():
 			arguments.raw_dpkg = True
@@ -212,21 +224,20 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc]
 		if not term.is_xterm() and not arguments.raw_dpkg:
 			os.environ["TERM"] = 'xterm'
 
-		spinner.text = Text('Initializing dpkg')
-		scroll_list.clear()
-		scroll_list.append(spinner)
+		#scroll_list.clear()
 
-	@staticmethod
-	def start_update() -> None:
+	def start_update(self) -> None:
 		"""Start update."""
-		if not arguments.verbose and not arguments.raw_dpkg:
+		if not arguments.raw_dpkg:
+		#if not arguments.verbose and not arguments.raw_dpkg:
 			live.start()
-			spinner.text = Text(color('Initializing dpkg...', 'BLUE'))
+		if not arguments.raw_dpkg:
+			self.task = dpkg_progress.add_task('', total=self.pkg_total)
 
 	@staticmethod
 	def finish_update() -> None:
 		"""Call when update has finished."""
-		if not arguments.verbose and not arguments.raw_dpkg:
+		if not arguments.raw_dpkg:
 			live.stop()
 		if notice:
 			print('\n'+color('Notices:'))
@@ -267,7 +278,7 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc]
 
 		signal.signal(signal.SIGWINCH, self.sigwinch_passthrough)
 		with open(DPKG_LOG, 'w', encoding="utf-8") as self.dpkg_log:
-			self.child.interact(self.format_dpkg_output)
+			self.child.interact(self.format_dpkg_output, self.scroll_list)
 		return os.WEXITSTATUS(self.wait_child())
 
 	def fork(self) -> tuple[int, int]:
@@ -336,8 +347,7 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc]
 				if arguments.verbose:
 					term.write(rawline)
 				else:
-					spinner.text = Text(color(rawline.decode().strip()))
-					scroll_bar(msg=None)
+					scroll_bar(self, msg=None)
 				return
 
 		# Set to raw if we have a conf prompt
@@ -363,15 +373,18 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc]
 		if check_line_spam(line, rawline):
 			return
 
-		spinner.text = Text(color('Running dpkg...'))
 		# Main format section for making things pretty
 		msg = msg_formatter(line)
 		# If verbose we just send it. No bars
+		self.advance_progress(line)
 		if arguments.verbose:
-			# We have to append Carriage return and new line or things get weird
-			term.write((msg+'\r\n').encode())
+			print(msg)
+			#live.console.print(msg)
+		elif 'dpkg:' in msg:
+			for line in msg.splitlines():
+				scroll_bar(self, line)
 		else:
-			scroll_bar(msg)
+			scroll_bar(self, msg)
 
 		self.set_last_line(rawline)
 
@@ -391,6 +404,13 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc]
 		# Things get really buggy so instead we check for a backspace
 		if term.BACKSPACE not in rawline:
 			self.last_line = rawline
+
+	def advance_progress(self, line: str) -> None:
+		"""Advance the dpkg progress bar."""
+		if 'Setting up' in line or 'Unpacking' in line or 'Removing' in line:
+			dpkg_progress.advance(self.task)
+		if arguments.verbose:
+			live.update(dpkg_progress.get_renderable())
 
 def check_line_spam(line: str, rawline: bytes) -> bool:
 	"""Check for, and handle, notices and spam."""
@@ -444,34 +464,40 @@ def msg_formatter(line: str) -> str:
 		line = lines(line, 'Setting up', 'GREEN')
 	elif line.startswith('Processing'):
 		line = lines(line, 'Processing', 'GREEN')
-
 	match = re.findall(VERSION_PATTERN, line)
 	if match:
 		return format_version(match, line)
+
 	return line
 
-def scroll_bar(msg: str | None = None) -> None:
+def scroll_bar(self,
+#scroll_list: list[Spinner | str],
+	msg: str | None = None, update: bool = False) -> None:
 	"""Print msg to our scroll bar live display."""
 	if msg:
-		scroll_list.append(msg)
+		self.scroll_list.append(msg)
 
-	scroll_list.append(
-		scroll_list.pop(
-			scroll_list.index(spinner)
+	if update:
+		self.scroll_list.append(
+			self.scroll_list.pop(
+				self.scroll_list.index(spinner)
+			)
 		)
-	)
 
 	# Set the scroll bar to take up a 3rd of the screen
 	scroll_lines = term.lines // 3
-	if len(scroll_list) > scroll_lines and len(scroll_list) > 10:
-		del scroll_list[0]
+	if len(self.scroll_list) > scroll_lines and len(self.scroll_list) > 10:
+		del self.scroll_list[0]
 
 	table = Table.grid()
 	table.add_column(no_wrap=True)
-	for item in scroll_list:
+	for item in self.scroll_list:
 		table.add_row(item)
 
-	live.update(table)
+	if not update:
+		table.add_row(dpkg_progress.get_renderable())
+
+	live.update(table, refresh=True)
 
 def setwinsize(file_descriptor: int, rows: int, cols: int) -> None:
 	"""Set the terminal window size of the child tty.
@@ -489,7 +515,8 @@ def setwinsize(file_descriptor: int, rows: int, cols: int) -> None:
 class AptExpect(fdspawn): # type: ignore[misc]
 	"""Subclass of fdspawn to add the interact method."""
 
-	def interact(self, output_filter: Callable[[bytes], None]) -> None:
+	def interact(self,
+		output_filter: Callable[[bytes], None], scroll_list: list[Spinner | str]) -> None:
 		"""Hacked up interact method.
 
 		Because pexpect doesn't want to have one for fdspawn.
@@ -508,11 +535,12 @@ class AptExpect(fdspawn): # type: ignore[misc]
 		setwinsize(self.child_fd, term.lines, term.columns)
 
 		try:
-			self.interact_copy(output_filter)
+			self.interact_copy(output_filter, scroll_list)
 		finally:
 			term.restore_mode()
 
-	def interact_copy(self, output_filter: Callable[[bytes], None]) -> None:
+	def interact_copy(self,
+		output_filter: Callable[[bytes], None], scroll_list: list[Spinner | str]) -> None:
 		"""Interact with the pty."""
 		while self.isalive():
 			try:

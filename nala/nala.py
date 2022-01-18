@@ -224,6 +224,7 @@ class Nala:
 				print("Abort.")
 				return
 
+			pkg_total: int = len(pkgs)
 			pkgs = [
 				# Don't download packages that already exist
 				pkg for pkg in pkgs if not pkg.marked_delete and not check_pkg(ARCHIVE_DIR, pkg)
@@ -237,9 +238,9 @@ class Nala:
 		else:
 			write_history(delete_names, install_names, upgrade_names)
 			write_log(delete_names, install_names, upgrade_names, autoremove_names)
-			self.start_dpkg()
+			self.start_dpkg(pkg_total)
 
-	def start_dpkg(self) -> None:
+	def start_dpkg(self, pkg_total: int) -> None:
 		"""Set environment and start dpkg."""
 		# Lets get our environment variables set before we get down to business
 		if arguments.noninteractive:
@@ -264,7 +265,7 @@ class Nala:
 		try:
 			self.cache.commit(
 				UpdateProgress(),
-				InstallProgress()
+				InstallProgress(pkg_total)
 			)
 		except apt_pkg.Error as err:
 			sys.exit(f'\r\n{ERROR_PREFIX+str(err)}')

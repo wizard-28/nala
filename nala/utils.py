@@ -76,6 +76,7 @@ class Terminal:
 		self.term: bool = True
 		self.mode: list[int | list[bytes | int]] = []
 		self.term_type: str = os.environ.get('TERM', '')
+		self.console = console
 		self.check()
 
 	def __repr__(self) -> str:
