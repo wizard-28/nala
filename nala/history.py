@@ -30,6 +30,7 @@ from datetime import datetime
 from getpass import getuser
 from json.decoder import JSONDecodeError
 from os import environ, getuid
+from pwd import getpwnam
 from typing import TYPE_CHECKING
 
 import jsbeautifier
@@ -43,12 +44,13 @@ from nala.utils import print_packages, term
 if TYPE_CHECKING:
 	from nala.nala import Nala
 
-try:
-	USER: str = environ["SUDO_USER"]
-	UID: str | int = environ["SUDO_UID"]
-except KeyError:
-	USER = getuser()
-	UID = getuid()
+USER: str = environ.get("DOAS_USER", '')
+UID: int = 0
+if USER:
+	UID = getpwnam(USER).pw_uid
+else:
+	USER = environ.get("SUDO_USER", getuser())
+	UID = int(environ.get("SUDO_UID", getuid()))
 
 def load_history_file() -> dict[str, dict[str, str | list[str] | list[list[str]]]]:
 	"""Load Nala history."""
