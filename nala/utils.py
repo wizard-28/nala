@@ -145,7 +145,8 @@ class Terminal:
 		"""Return True if we're in an xterm, False otherwise."""
 		return 'xterm' in self.term_type
 
-	def is_su(self) -> bool:
+	@staticmethod
+	def is_su() -> bool:
 		"""Return True if we're super user and False if we're not."""
 		return os.geteuid() == 0
 
