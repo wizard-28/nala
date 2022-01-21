@@ -81,6 +81,12 @@ class Terminal:
 		self.mode: list[int | list[bytes | int]] = []
 		self.term_type: str = os.environ.get('TERM', '')
 		self.check()
+		if self.lines < 13 or self.columns < 31:
+			print("Terminal can't support dialog, falling back to readline")
+			os.environ["DEBIAN_FRONTEND"] = "readline"
+		# Readline is too hard to support with our fancy formatting
+		if os.environ.get("DEBIAN_FRONTEND") == "readline":
+			arguments.raw_dpkg = True
 
 	def __repr__(self) -> str:
 		"""Represent state of the user terminal as a string."""
