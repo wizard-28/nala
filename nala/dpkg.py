@@ -525,7 +525,7 @@ def get_group(update_spinner: bool, use_bar: bool) -> Group:
 		dpkg_progress.get_renderable(),
 	)
 
-def slice_list() -> list[str]:
+def slice_list() -> None:
 	"""Set scroll bar to take up only 1/3 of the screen."""
 	global scroll_list # pylint: disable=invalid-name, global-statement
 	scroll_lines = term.lines // 3
