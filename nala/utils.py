@@ -62,12 +62,14 @@ class Terminal:
 	DISABLE_ALT_SCREEN = b'\x1b[?1049l'
 	SHOW_CURSOR = b'\x1b[?25h'
 	HIDE_CURSOR = b'\x1b[?25l'
+	SET_CURSER = b'\x1b[?1l'
 	SAVE_TERM = b'\x1b[22;0;0t'
 	RESTORE_TERM = b'\x1b[23;0;0t'
 	APPLICATION_KEYPAD = b'\x1b='
 	NORMAL_KEYPAD = b'\x1b>'
 	CR = b'\r'
 	LF = b'\n'
+	CRLF = b'\r\n'
 
 	def __init__(self) -> None:
 		"""Represent the user terminal."""
