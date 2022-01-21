@@ -252,6 +252,7 @@ class Nala:
 			# If dpkg quits for any reason we lose the cursor
 			# If we don't stop the live session
 			dpkg_live.stop()
+		print(color("Finished Successfully", 'GREEN'))
 
 	def sort_pkg_changes(self, pkgs: list[Package]
 		) -> tuple[list[list[str]], list[list[str]], list[list[str]], list[list[str]]]:

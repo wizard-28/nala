@@ -243,7 +243,6 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc] # pylint: disa
 			print('\n'+color('Notices:', 'YELLOW'))
 			for notice_msg in notice:
 				print(notice_msg)
-		print(color("Finished Successfully", 'GREEN'))
 
 	def __exit__(self, _type: object, value: object, traceback: object) -> None:
 		"""Exit."""
