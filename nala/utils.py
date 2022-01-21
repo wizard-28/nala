@@ -145,6 +145,10 @@ class Terminal:
 		"""Return True if we're in an xterm, False otherwise."""
 		return 'xterm' in self.term_type
 
+	def is_su(self) -> bool:
+		"""Return True if we're super user and False if we're not."""
+		return os.geteuid() == 0
+
 term = Terminal()
 
 def color(text: str, text_color: str = 'WHITE') -> str:
