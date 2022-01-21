@@ -544,7 +544,9 @@ def apt_error(apt_err: FetchFailedException | LockFailedException) -> NoReturn:
 			print(ERROR_PREFIX+err.strip())
 		sys.exit(1)
 	print(ERROR_PREFIX+msg)
-	sys.exit('Are you root?')
+	if not term.is_su():
+		sys.exit('Are you root?')
+	sys.exit(1)
 
 class PkgDownloader:
 	"""Manage Package Downloads."""
