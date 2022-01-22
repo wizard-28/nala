@@ -342,7 +342,6 @@ def get_pkg_name(candidate: Version) -> str:
 		return Path(candidate.filename).name.replace('_', epoch, 1)
 	return Path(candidate.filename).name
 
-
 def sort_pkg_name(pkg: Package) -> str:
 	"""Sort by package name.
 
