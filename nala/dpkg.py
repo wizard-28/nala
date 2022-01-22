@@ -430,7 +430,8 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc] # pylint: disa
 
 	def advance_progress(self, line: str) -> None:
 		"""Advance the dpkg progress bar."""
-		if 'Setting up' in line or 'Unpacking' in line or 'Removing' in line:
+		if ('Setting up' in line or 'Unpacking' in line
+		    or 'Removing' in line and '(' in line):
 			dpkg_progress.advance(self.task)
 		if arguments.verbose:
 			self.live.update(
