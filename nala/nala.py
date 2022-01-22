@@ -45,7 +45,7 @@ from apt.cache import Cache, FetchFailedException, LockFailedException
 from apt.package import Package, Version
 
 from nala.constants import ARCHIVE_DIR, ERROR_PREFIX, NALA_DIR, PARTIAL_DIR
-from nala.dpkg import InstallProgress, UpdateProgress, live as dpkg_live
+from nala.dpkg import InstallProgress, UpdateProgress
 from nala.history import write_history, write_log
 from nala.logger import dprint
 from nala.options import arguments
@@ -75,7 +75,8 @@ class Nala:
 		except (LockFailedException, FetchFailedException) as err:
 			apt_error(err)
 		finally:
-			dpkg_live.stop()
+			term.restore_mode()
+			term.write(term.SHOW_CURSOR+term.CLEAR_LINE)
 
 	def upgrade(self, dist_upgrade: bool = False) -> None:
 		"""Upgrade pkg[s]."""
@@ -249,9 +250,9 @@ class Nala:
 		except apt_pkg.Error as err:
 			sys.exit(f'\r\n{ERROR_PREFIX+str(err)}')
 		finally:
+			term.restore_mode()
 			# If dpkg quits for any reason we lose the cursor
-			# If we don't stop the live session
-			dpkg_live.stop()
+			term.write(term.SHOW_CURSOR+term.CLEAR_LINE)
 		print(color("Finished Successfully", 'GREEN'))
 
 	def sort_pkg_changes(self, pkgs: list[Package]
