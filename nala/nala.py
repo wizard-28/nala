@@ -330,6 +330,18 @@ class Nala:
 		if arguments.download_only:
 			print("Nala will only download the packages")
 
+def get_pkg_name(candidate: Version) -> str:
+	"""Return the package name.
+
+	Checks if we need and epoch in the path.
+	"""
+	if ':' in candidate.version:
+		index = candidate.version.index(':')
+		epoch = '_'+candidate.version[:index]+r'%3a'
+		return Path(candidate.filename).name.replace('_', epoch, 1)
+	return Path(candidate.filename).name
+
+
 def sort_pkg_name(pkg: Package) -> str:
 	"""Sort by package name.
 
@@ -425,7 +437,7 @@ def check_pkg(directory: Path, candidate: Package | Version) -> bool:
 	"""Check if file exists, is correct, and run check hash."""
 	if isinstance(candidate, Package):
 		candidate = pkg_candidate(candidate)
-	path = directory / Path(candidate.filename).name
+	path = directory / get_pkg_name(candidate)
 	if not path.exists() or path.stat().st_size != candidate.size:
 		return False
 	hash_type, hash_value = get_hash(candidate)
@@ -468,7 +480,7 @@ def process_downloads(pkgs: list[Package]) -> bool:
 	"""Process the downloaded packages."""
 	link_success = True
 	for pkg in pkgs:
-		filename = Path(pkg_candidate(pkg).filename).name
+		filename = get_pkg_name(pkg_candidate(pkg))
 		destination = ARCHIVE_DIR / filename
 		source = PARTIAL_DIR / filename
 		try:
@@ -601,7 +613,7 @@ class PkgDownloader:
 
 	def _download_pkg(self, candidate: Version, url: str) -> None:
 		"""Download package and update progress."""
-		dest = PARTIAL_DIR / Path(candidate.filename).name
+		dest = PARTIAL_DIR / get_pkg_name(candidate)
 		verbose_print(f"{color('Starting Download:', 'GREEN')} {url}")
 		with requests.get(url, stream=True) as download:
 			download.raise_for_status()
