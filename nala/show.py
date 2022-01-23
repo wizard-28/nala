@@ -195,24 +195,23 @@ def format_sources(candidate: Version, pkg: Package) -> str:
 	"""Show apt sources."""
 	origin = candidate.origins[0]
 	if origin.archive == 'now':
-		source = get_local_source(pkg.shortname)
-		return f'{color("APT-Sources:")} {source}'
-
-	for mirror in candidate.uris:
-		if 'mirror://' in mirror:
-			index = mirror.index('/pool')
-			url = mirror[:index]
-			break
-	else:
-		uris = candidate.uris[:]
-		shuffle(uris)
-		index = uris[0].index('/pool')
-		url = uris[0][:index]
+		return f'{color("APT-Sources:")} {get_local_source(pkg.shortname)}'
 
 	return (
-		f"{color('APT-Sources:')} {url} {origin.archive}/"
+		f"{color('APT-Sources:')} {source_url(candidate.uris)} {origin.archive}/"
 		f"{origin.component} {candidate.architecture} Packages"
 	)
+
+def source_url(uris: list[str]) -> str:
+	"""Return the source url."""
+	for mirror in uris:
+		if 'mirror://' in mirror:
+			index = mirror.index('/pool')
+			return mirror[:index]
+
+	shuffle(uris)
+	index = uris[0].index('/pool')
+	return uris[0][:index]
 
 def get_local_source(pkg_name: str) -> str:
 	"""Determine the local source and return it."""
