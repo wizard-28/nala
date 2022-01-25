@@ -178,7 +178,7 @@ DPKG_MSG: dict[str, tuple[bytes, ...]] = {
 	'NOTICES' : NOTICES,
 	'DPKG_STATUS' : DPKG_STATUS,}
 
-NALA_LICENSE = (
+THIRD_PARTY_LICENSES = (
 """
 ==============================================================================
 PythonPing: https://github.com/alessandromaggio/pythonping
