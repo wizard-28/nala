@@ -30,9 +30,9 @@ import socket
 import sys
 from concurrent.futures import ThreadPoolExecutor
 
-import requests  # type: ignore[import]
 from apt_pkg import get_architectures
 from aptsources.distro import get_distro
+from httpx import ConnectError, get
 from pythonping import ping
 from rich.progress import TaskID
 
@@ -156,8 +156,8 @@ def debian_mirror(country_list: tuple[str, ...] | None) -> tuple[str, ...]:
 def fetch_mirrors(url: str, splitter: str) -> tuple[str, ...]:
 	"""Attempt to fetch the url and split a list based on the splitter."""
 	try:
-		mirror_list = requests.get(url).text.split(splitter)
-	except requests.ConnectionError:
+		mirror_list = get(url).text.split(splitter)
+	except ConnectError:
 		sys.exit(ERROR_PREFIX+f'unable to connect to {url}')
 	return tuple(mirror_list)
 

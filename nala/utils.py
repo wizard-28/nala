@@ -33,10 +33,8 @@ import tty
 from datetime import datetime
 from pathlib import Path
 from shutil import get_terminal_size
-from typing import Pattern
 
 import jsbeautifier
-import requests
 from apt.package import Package, Version
 
 from nala.constants import (COLOR_CODES,
@@ -263,24 +261,6 @@ def pkg_installed(pkg: Package) -> Version:
 	"""Type enforce package installed."""
 	assert pkg.installed
 	return pkg.installed
-
-def filter_uris(candidate: Version, mirrors: list[str], pattern: Pattern[str]) -> list[str]:
-	"""Filter uris into usable urls."""
-	urls: list[str] = []
-	for uri in candidate.uris:
-		# Regex to check if we're using mirror.txt
-		regex = pattern.search(uri)
-		if regex:
-			domain = regex.group(1)
-			if not mirrors:
-				try:
-					mirrors = requests.get(f"http://{domain}/mirrors.txt").text.splitlines()
-				except requests.ConnectionError:
-					sys.exit(ERROR_PREFIX+f'unable to connect to http://{domain}/mirrors.txt')
-			urls.extend([link+candidate.filename for link in mirrors])
-			continue
-		urls.append(uri)
-	return urls
 
 def print_packages(
 	headers: list[str], names: list[list[str]],
