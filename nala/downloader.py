@@ -1,3 +1,29 @@
+#                 __
+#    ____ _____  |  | _____
+#   /    \\__  \ |  | \__  \
+#  |   |  \/ __ \|  |__/ __ \_
+#  |___|  (____  /____(____  /
+#       \/     \/          \/
+#
+# Copyright (C) 2010 Tatsuhiro Tsujikawa
+# Copyright (C) 2021, 2022 Blake Lee
+#
+# This file is part of nala
+# nala is based upon apt-metalink https://github.com/tatsuhiro-t/apt-metalink
+#
+# nala is program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# nala is program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with nala.  If not, see <https://www.gnu.org/licenses/>.
+"""Module for package downloader."""
 from __future__ import annotations
 
 import asyncio
@@ -21,7 +47,7 @@ from nala.utils import (check_pkg, color, dprint,
 
 MIRROR_PATTERN = re.compile(r'mirror://([A-Za-z_0-9.-]+).*')
 
-class PkgDownloader:
+class PkgDownloader: # pylint: disable=too-many-instance-attributes
 	"""Manage Package Downloads."""
 
 	def __init__(self, pkgs: list[Package]) -> None:
@@ -31,6 +57,7 @@ class PkgDownloader:
 		self.total_pkgs: int = len(self.pkgs)
 		self.count: int = 0
 		self.live: Live
+		self.mirrors: list[str] = []
 		self.task = pkg_download_progress.add_task(
 			"[bold][blue]Downloading [green]Packages",
 			total=self.total_size
@@ -82,8 +109,8 @@ class PkgDownloader:
 			dprint(f'Moving {source} -> {destination}')
 			source.rename(destination)
 		except OSError as error:
-				print(ERROR_PREFIX+f"Failed to move archive file {error}")
-				return False
+			print(ERROR_PREFIX+f"Failed to move archive file {error}")
+			return False
 		return True
 
 	async def _download(self, client: AsyncClient,
@@ -127,15 +154,32 @@ class PkgDownloader:
 
 	def _set_pkg_urls(self) -> None:
 		"""Set pkg_urls list."""
-		mirrors: list[str] = []
 		for pkg in self.pkgs:
 			candidate = pkg_candidate(pkg)
 			urls: list[str] = []
-			urls.extend(filter_uris(candidate, mirrors, MIRROR_PATTERN))
+			urls.extend(self.filter_uris(candidate, MIRROR_PATTERN))
 			# Randomize the urls to minimize load on a single mirror.
 			shuffle(urls)
 			urls.insert(0, candidate)
 			self.pkg_urls.append(urls)
+
+	def filter_uris(self, candidate: Version, pattern: Pattern[str]) -> list[str]:
+		"""Filter uris into usable urls."""
+		urls: list[str] = []
+		for uri in candidate.uris:
+			# Regex to check if we're using mirror.txt
+			regex = pattern.search(uri)
+			if regex:
+				domain = regex.group(1)
+				if not self.mirrors:
+					try:
+						self.mirrors = get(f"http://{domain}/mirrors.txt").text.splitlines()
+					except ConnectionError:
+						sys.exit(ERROR_PREFIX+f'unable to connect to http://{domain}/mirrors.txt')
+				urls.extend([link+candidate.filename for link in self.mirrors])
+				continue
+			urls.append(uri)
+		return urls
 
 	def _gen_table(self, pkg_name: str) -> Table:
 		"""Generate Rich Table."""
@@ -161,27 +205,6 @@ def check_index(num: int, urls: list[Version | str], candidate: Version) -> None
 		print('No more mirrors for...', Path(candidate.filename).name)
 		return
 	print(color('Trying:', 'YELLOW'), next_url)
-
-def filter_uris(candidate: Version, mirrors: list[str], pattern: Pattern[str]) -> list[str]:
-	"""Filter uris into usable urls."""
-	urls: list[str] = []
-	for uri in candidate.uris:
-		# Regex to check if we're using mirror.txt
-		regex = pattern.search(uri)
-		if regex:
-			domain = regex.group(1)
-			if not mirrors:
-				try:
-					mirrors = get(f"http://{domain}/mirrors.txt").text.splitlines()
-				except ConnectionError:
-					sys.exit(ERROR_PREFIX+f'unable to connect to http://{domain}/mirrors.txt')
-			urls.extend([link+candidate.filename for link in mirrors])
-			continue
-		urls.append(uri)
-	return urls
-
-class IntegrityError(Exception):
-	"""Exception for integrity checking."""
 
 def guess_concurrent(pkg_urls: list[list[Version | str]]) -> int:
 	"""Determine how many concurrent downloads to do."""
