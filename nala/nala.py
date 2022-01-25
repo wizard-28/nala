@@ -28,31 +28,25 @@ from __future__ import annotations
 
 import errno
 import fnmatch
-import hashlib
-import re
 import sys
-from concurrent.futures import ThreadPoolExecutor
+from asyncio import run
 from copy import deepcopy
 from os import environ
-from pathlib import Path
-from random import shuffle
-from shutil import copyfileobj
-from typing import NoReturn, Pattern
+from typing import NoReturn
 
 import apt_pkg
-import requests  # type: ignore[import]
 from apt.cache import Cache, FetchFailedException, LockFailedException
-from apt.package import Package, Version
+from apt.package import Package
 
 from nala.constants import ARCHIVE_DIR, ERROR_PREFIX, NALA_DIR, PARTIAL_DIR
+from nala.downloader import PkgDownloader
 from nala.dpkg import InstallProgress, UpdateProgress
 from nala.history import write_history, write_log
-from nala.logger import dprint
 from nala.options import arguments
-from nala.rich import Live, Table, pkg_download_progress
+from nala.rich import Table
 from nala.show import check_virtual, show_main
-from nala.utils import (ask, color, pkg_candidate, pkg_installed,
-				print_packages, term, unit_str, verbose_print)
+from nala.utils import (ask, check_pkg, color, dprint, get_pkg_name,
+				pkg_candidate, pkg_installed, print_packages, term, unit_str)
 
 
 class Nala:
@@ -210,8 +204,8 @@ class Nala:
 				pkg for pkg in pkgs if not pkg.marked_delete and not check_pkg(ARCHIVE_DIR, pkg)
 			]
 
-			if not PkgDownloader(pkgs).download():
-				print("Some downloads failed. apt_pkg will take care of them.")
+		if not run(PkgDownloader(pkgs).start_download()):
+			print("Some downloads failed. apt_pkg will take care of them.")
 
 		if arguments.download_only:
 			print("Download complete and in download only mode.")
@@ -331,17 +325,6 @@ class Nala:
 		if arguments.download_only:
 			print("Nala will only download the packages")
 
-def get_pkg_name(candidate: Version) -> str:
-	"""Return the package name.
-
-	Checks if we need and epoch in the path.
-	"""
-	if ':' in candidate.version:
-		index = candidate.version.index(':')
-		epoch = '_'+candidate.version[:index]+r'%3a'
-		return Path(candidate.filename).name.replace('_', epoch, 1)
-	return Path(candidate.filename).name
-
 def sort_pkg_name(pkg: Package) -> str:
 	"""Sort by package name.
 
@@ -433,49 +416,6 @@ def pkg_error(pkg_list: list[str], msg: str, banter: str = '', terminate: bool =
 	if terminate:
 		sys.exit(1)
 
-def check_pkg(directory: Path, candidate: Package | Version) -> bool:
-	"""Check if file exists, is correct, and run check hash."""
-	if isinstance(candidate, Package):
-		candidate = pkg_candidate(candidate)
-	path = directory / get_pkg_name(candidate)
-	if not path.exists() or path.stat().st_size != candidate.size:
-		return False
-	hash_type, hash_value = get_hash(candidate)
-	try:
-		return check_hash(path, hash_type, hash_value)
-	except OSError as err:
-		if err.errno != errno.ENOENT:
-			print("Failed to check hash", err)
-		return False
-
-def check_hash(path: Path, hash_type: str, hash_value: str) -> bool:
-	"""Check hash value."""
-	hash_fun = hashlib.new(hash_type)
-	with path.open('rb') as file:
-		while True:
-			data = file.read(4096)
-			if not data:
-				break
-			hash_fun.update(data)
-	local_hash = hash_fun.hexdigest()
-	debugger = (
-		str(path),
-		f"Candidate Hash: {hash_type} {hash_value}",
-		f"Local Hash: {local_hash}"
-	)
-	dprint(debugger)
-	return local_hash == hash_value
-
-def get_hash(version: Version) -> tuple[str, str]:
-	"""Get the correct hash value."""
-	if version.sha256:
-		return ("sha256", version.sha256)
-	if version.sha1:
-		return ("sha1", version.sha1)
-	if version.md5:
-		return ("md5", version.md5)
-	sys.exit(ERROR_PREFIX+f"{Path(version.filename).name} can't be checked for integrity.")
-
 def process_downloads(pkgs: list[Package]) -> bool:
 	"""Process the downloaded packages."""
 	link_success = True
@@ -491,32 +431,6 @@ def process_downloads(pkgs: list[Package]) -> bool:
 				print(ERROR_PREFIX+f"Failed to move archive file {err}")
 			link_success = False
 	return link_success
-
-def filter_uris(candidate: Version, mirrors: list[str], pattern: Pattern[str]) -> list[str]:
-	"""Filter uris into usable urls."""
-	urls: list[str] = []
-	for uri in candidate.uris:
-		# Regex to check if we're using mirror.txt
-		regex = pattern.search(uri)
-		if regex:
-			domain = regex.group(1)
-			if not mirrors:
-				try:
-					mirrors = requests.get(f"http://{domain}/mirrors.txt").text.splitlines()
-				except requests.ConnectionError:
-					sys.exit(ERROR_PREFIX+f'unable to connect to http://{domain}/mirrors.txt')
-			urls.extend([link+candidate.filename for link in mirrors])
-			continue
-		urls.append(uri)
-	return urls
-
-def guess_concurrent(pkgs: list[Package]) -> int:
-	"""Determine how many concurrent downloads to do."""
-	max_uris = 2
-	for pkg in pkgs:
-		candidate = pkg_candidate(pkg)
-		max_uris = max(len(candidate.uris)*2, max_uris)
-	return max_uris
 
 def transaction_summary(delete_header: str,
 	delete_total: int, install_total: int,
@@ -559,101 +473,3 @@ def apt_error(apt_err: FetchFailedException | LockFailedException) -> NoReturn:
 	if not term.is_su():
 		sys.exit('Are you root?')
 	sys.exit(1)
-
-class PkgDownloader:
-	"""Manage Package Downloads."""
-
-	def __init__(self, pkgs: list[Package]) -> None:
-		"""Manage Package Downloads."""
-		self.pkgs = pkgs
-		self.total_size: int = sum(pkg_candidate(pkg).size for pkg in self.pkgs)
-		self.total_pkgs: int = len(self.pkgs)
-		self.count: int = 0
-		self.live: Live
-		self.task = pkg_download_progress.add_task(
-			"[bold][blue]Downloading [green]Packages",
-			total=self.total_size
-		)
-
-		http_proxy = apt_pkg.config.find('Acquire::http::Proxy')
-		https_proxy = apt_pkg.config.find('Acquire::https::Proxy', http_proxy)
-		ftp_proxy = apt_pkg.config.find('Acquire::ftp::Proxy')
-
-		self.proxy: dict[str, str] = {
-			'http' : http_proxy,
-			'https' : https_proxy,
-			'ftp' : ftp_proxy
-		}
-
-	def download(self) -> bool:
-		"""Download pkgs."""
-		with Live() as self.live:
-			# We don't want to use more than 16 threads.
-			threads = min(guess_concurrent(self.pkgs), 16)
-			with ThreadPoolExecutor(max_workers=threads) as pool:
-				mirrors: list[str] = []
-				pattern = re.compile('mirror://([A-Za-z_0-9.-]+).*')
-				for pkg in self.pkgs:
-					urls: list[str] = []
-					candidate = pkg_candidate(pkg)
-					urls = filter_uris(candidate, mirrors, pattern)
-					# Randomize the urls to minimize load on a single mirror.
-					shuffle(urls)
-					self._start_thread(urls, pool, candidate)
-		return process_downloads(self.pkgs)
-
-	@staticmethod
-	def check_integrity(candidate: Version, filename: str) -> None:
-		"""Check package integrity. Raise IntegrityError if issue."""
-		dprint(f'Checking integrity: {filename}')
-		if not check_pkg(PARTIAL_DIR, candidate):
-			dprint(f'Integrity check failed: {filename}')
-			raise IntegrityError("This is only to catch")
-		dprint(f'Integrity check successful: {filename}')
-
-	def _download_pkg(self, candidate: Version, url: str) -> None:
-		"""Download package and update progress."""
-		dest = PARTIAL_DIR / get_pkg_name(candidate)
-		verbose_print(f"{color('Starting Download:', 'GREEN')} {url}")
-		with requests.get(url, stream=True) as download:
-			download.raise_for_status()
-			with dest.open('wb') as file:
-				copyfileobj(download.raw, file)
-		self.check_integrity(candidate, dest.name)
-
-		verbose_print(f"{color('Finished Download:', 'GREEN')} {dest.name}")
-		self._update_progress(dest.name, candidate.size)
-
-	def _start_thread(self,
-		urls: list[str], pool: ThreadPoolExecutor, candidate: Version) -> None:
-		"""Start download thread."""
-		for _ in urls:
-			try:
-				url = urls.pop(0)
-				pool.submit(self._download_pkg, candidate, url)
-				break
-			except (requests.ConnectionError, requests.HTTPError):
-				print("There was a problem connecting. Trying the next URL")
-			except IntegrityError:
-				continue
-			except IndexError:
-				sys.exit(ERROR_PREFIX+f'There are no more URLs to try for {Path(candidate.filename).name}..')
-
-	def _gen_table(self, pkg_name: str) -> Table:
-		"""Generate Rich Table."""
-		table = Table.grid()
-		table.add_row(f"{color('Total Packages:', 'GREEN')} {self.count}/{self.total_pkgs}")
-		table.add_row(f"{color('Last Completed:', 'GREEN')} {pkg_name}")
-		table.add_row(pkg_download_progress.get_renderable())
-		return table
-
-	def _update_progress(self, pkg_name: str, size: int) -> None:
-		"""Update download progress."""
-		pkg_download_progress.advance(self.task, advance=size)
-		self.count += 1
-		self.live.update(
-			self._gen_table(pkg_name)
-		)
-
-class IntegrityError(Exception):
-	"""Exception for integrity checking."""
