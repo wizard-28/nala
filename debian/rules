@@ -1,4 +1,5 @@
 #!/usr/bin/make -f
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 
 %:
 	set -x
@@ -23,13 +24,14 @@ override_dh_clean:
 	dh_clean
 
 execute_before_dh_auto_build:
-	pip install rich pythonping
+	pip install rich pythonping httpx
 
 override_dh_auto_build:
 	nuitka3 --assume-yes-for-downloads \
 	--follow-import-to=nala \
 	--follow-import-to=pythonping \
 	--follow-import-to=rich \
+	--follow-import-to=httpx \
 	--nofollow-import-to=jsbeautifier \
 	--nofollow-import-to=apt \
 	--nofollow-import-to=pygments \
@@ -37,6 +39,5 @@ override_dh_auto_build:
 	--nofollow-import-to=aptsources \
 	--nofollow-import-to=colorama \
 	--nofollow-import-to=commonmark \
-	--nofollow-import-to=requests \
 	--plugin-enable=pylint-warnings \
 	nala-cli.py -o nala-cli.build/nala
