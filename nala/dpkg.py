@@ -225,7 +225,7 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc] # pylint: disa
 		self.child_fd: int
 		self.child_pid: int
 		self.line_fix: list[bytes] = []
-		self.pkg_total = pkg_total
+		self.pkg_total = pkg_total + 1
 		self.task: TaskID
 		self._dpkg_log: TextIO
 		self.live = Live(auto_refresh=False)
@@ -246,6 +246,8 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc] # pylint: disa
 	def finish_update(self) -> None:
 		"""Call when update has finished."""
 		if not arguments.raw_dpkg:
+			dpkg_progress.advance(self.task)
+			scroll_bar(self)
 			self.live.stop()
 		if notice:
 			print('\n'+color('Notices:', 'YELLOW'))
