@@ -39,9 +39,11 @@ import apt_pkg
 from apt.package import Package, Version
 from httpx import (AsyncClient, ConnectTimeout,
 				HTTPStatusError, RequestError, get)
+from rich.panel import Panel
 
 from nala.constants import ARCHIVE_DIR, ERROR_PREFIX, PARTIAL_DIR
-from nala.rich import Live, Spinner, Table, pkg_download_progress
+from nala.rich import (Live, Spinner, Table,
+				Text, pkg_download_progress, remaining)
 from nala.utils import (check_pkg, color, dprint,
 				get_pkg_name, pkg_candidate, unit_str, vprint)
 
@@ -58,10 +60,7 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 		self.count: int = 0
 		self.live: Live
 		self.mirrors: list[str] = []
-		self.task = pkg_download_progress.add_task(
-			"[bold][blue]Downloading [green]Packages",
-			total=self.total_size
-		)
+		self.task = pkg_download_progress.add_task("", total=self.total_size)
 		self.pkg_urls: list[list[Version | str]] = []
 		self._set_pkg_urls()
 
@@ -82,10 +81,9 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 			return True
 		concurrent = min(guess_concurrent(self.pkg_urls), 16)
 		semaphore = Semaphore(concurrent)
-		starting_downloads = Spinner('dots', color('Starting Downloads...', 'BLUE'))
 		with Live() as self.live:
 			async with AsyncClient(follow_redirects=True, timeout=20) as client:
-				self.live.update(starting_downloads)
+				self.live.update(self._gen_table(initial=True))
 				loop = asyncio.get_running_loop()
 				tasks = (
 					loop.create_task(
@@ -181,13 +179,17 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 			urls.append(uri)
 		return urls
 
-	def _gen_table(self, pkg_name: str) -> Table:
+	def _gen_table(self, pkg_name: str = '', initial: bool = False) -> Table:
 		"""Generate Rich Table."""
 		table = Table.grid()
-		table.add_row(f"{color('Total Packages:', 'GREEN')} {self.count}/{self.total_pkgs}")
-		table.add_row(f"{color('Last Completed:', 'GREEN')} {pkg_name}")
+
+		table.add_row(Text.from_ansi(f"{color('Total Packages:', 'GREEN')} {self.count}/{self.total_pkgs}"))
+		if initial:
+			table.add_row(Spinner('dots', color('Starting Downloads...', 'BLUE')))
+		else:
+			table.add_row(Text.from_ansi(f"{color('Last Completed:', 'GREEN')} {pkg_name}"))
 		table.add_row(pkg_download_progress.get_renderable())
-		return table
+		return Panel(table, title='[bold white]Downloading...', title_align='left', border_style='bold green')
 
 	async def _update_progress(self, pkg_name: str, size: int) -> None:
 		"""Update download progress."""
