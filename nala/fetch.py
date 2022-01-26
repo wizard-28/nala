@@ -156,7 +156,7 @@ def debian_mirror(country_list: tuple[str, ...] | None) -> tuple[str, ...]:
 def fetch_mirrors(url: str, splitter: str) -> tuple[str, ...]:
 	"""Attempt to fetch the url and split a list based on the splitter."""
 	try:
-		mirror_list = get(url).text.split(splitter)
+		mirror_list = get(url, timeout=15).text.split(splitter)
 	except ConnectError:
 		sys.exit(ERROR_PREFIX+f'unable to connect to {url}')
 	return tuple(mirror_list)
