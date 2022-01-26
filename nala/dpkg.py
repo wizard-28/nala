@@ -117,8 +117,8 @@ class UpdateProgress(text.AcquireProgress, base.OpProgress): # type: ignore[misc
 				if arguments.verbose:
 					print(msg)
 					break
-				scroll_bar(
-					self, msg, install=self.install,
+				scroll_bar(self,
+					msg, install=self.install, fetch=self.install,
 					update_spinner=True, use_bar=False
 				)
 				break
@@ -136,10 +136,14 @@ class UpdateProgress(text.AcquireProgress, base.OpProgress): # type: ignore[misc
 				pulse.insert(last-2, ' '*fill)
 				msg = ' '.join(pulse)
 			if 'Fetched' in msg:
-				scroll_bar(self, msg, install=self.install, use_bar=False)
+				scroll_bar(self,
+					msg, install=self.install,
+					fetch=self.install, use_bar=False
+				)
 				return
 			spinner.text = Text.from_ansi(msg)
-			scroll_bar(self, install=self.install,
+			scroll_bar(self,
+				install=self.install, fetch=self.install,
 				update_spinner=True, use_bar=False
 			)
 
@@ -503,17 +507,18 @@ def msg_formatter(line: str) -> str:
 		return format_version(match, line)
 	return line
 
-def get_title(install: bool) -> str:
+def get_title(install: bool, fetch: bool) -> str:
 	"""Get the title for our panel."""
-	scroll_title = '[bold white]Updating Package List'
-	if arguments.command and install:
+	if arguments.command and install and not fetch:
 		if arguments.command in ('remove', 'purge'):
-			scroll_title = scroll_title = '[bold white]Removing Packages'
-		elif arguments.command in ('update', 'upgrade'):
-			scroll_title = scroll_title = '[bold white]Updating Packages'
-		elif arguments.command == 'install':
-			scroll_title = scroll_title = '[bold white]Installing Packages'
-	return scroll_title
+			return '[bold white]Removing Packages'
+		if arguments.command in ('update', 'upgrade'):
+			return '[bold white]Updating Packages'
+		if arguments.command == 'install':
+			return '[bold white]Installing Packages'
+	if install and fetch:
+		return '[bold white]Fetching Missed Packages'
+	return '[bold white]Updating Package List'
 
 def get_group(update_spinner: bool, use_bar: bool) -> Group:
 	"""Get the group for our panel."""
@@ -540,14 +545,14 @@ def slice_list() -> None:
 		scroll_list = scroll_list[total:]
 
 def scroll_bar(self: UpdateProgress | InstallProgress,
-	msg: str = '', install: bool = True,
+	msg: str = '', install: bool = True, fetch: bool = False,
 	update_spinner: bool = False, use_bar: bool = True) -> None:
 	"""Print msg to our scroll bar live display."""
 	if msg:
 		scroll_list.append(msg)
 
 	slice_list()
-	scroll_title = get_title(install)
+	scroll_title = get_title(install, fetch)
 
 	bar_style = 'bold green' if arguments.verbose else 'bold blue'
 	table = Table.grid()
