@@ -74,15 +74,15 @@ class NalaDownload(DownloadColumn): # type: ignore[misc]
 		return Text(download_status, style="bold green")
 
 class TimeRemaining(TimeRemainingColumn): # type: ignore[misc]
-    """Renders estimated time remaining."""
+	"""Renders estimated time remaining."""
 
-    def render(self, task: Task) -> Text:
-        """Show time remaining."""
-        remaining = task.time_remaining
-        if remaining is None:
-            return Text("-:--:--", style="bold white")
-        remaining_delta = timedelta(seconds=int(remaining))
-        return Text(str(remaining_delta), style="white")
+	def render(self, task: Task) -> Text:
+		"""Show time remaining."""
+		remaining = task.time_remaining
+		if remaining is None:
+			return Text("-:--:--", style="bold white")
+		remaining_delta = timedelta(seconds=int(remaining))
+		return Text(str(remaining_delta), style="white")
 
 bar_back_style = Style(color='red')
 bar_style = Style(color='cyan')
