@@ -37,6 +37,7 @@ from rich.text import Text
 
 __all__ = ('Spinner', 'Table', 'Column', 'Live', 'Text')
 
+# pylint: disable=too-few-public-methods
 class NalaTransferSpeed(TransferSpeedColumn): # type: ignore[misc]
 	"""Subclass of TransferSpeedColumn."""
 
