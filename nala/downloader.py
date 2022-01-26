@@ -42,7 +42,7 @@ from httpx import (AsyncClient, ConnectTimeout,
 from rich.panel import Panel
 
 from nala.constants import ARCHIVE_DIR, ERROR_PREFIX, PARTIAL_DIR
-from nala.rich import Live, Spinner, Table, Text, pkg_download_progress
+from nala.rich import Live, Table, Text, pkg_download_progress
 from nala.utils import (check_pkg, color, dprint,
 				get_pkg_name, pkg_candidate, unit_str, vprint)
 
@@ -54,16 +54,18 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 	def __init__(self, pkgs: list[Package]) -> None:
 		"""Manage Package Downloads."""
 		self.pkgs = pkgs
-		self.total_size: int = sum(pkg_candidate(pkg).size for pkg in self.pkgs)
 		self.total_pkgs: int = len(self.pkgs)
 		self.count: int = 0
 		self.live: Live
 		self.mirrors: list[str] = []
-		self.task = pkg_download_progress.add_task("", total=self.total_size)
+		self.last_completed: str = ''
+		self.task = pkg_download_progress.add_task(
+			"", total=sum(pkg_candidate(pkg).size for pkg in self.pkgs)
+		)
 		self.pkg_urls: list[list[Version | str]] = []
 		self._set_pkg_urls()
-
 		self.pkg_urls = sorted(self.pkg_urls, key=sort_pkg_size, reverse=True)
+
 		http_proxy = apt_pkg.config.find('Acquire::http::Proxy')
 		https_proxy = apt_pkg.config.find('Acquire::https::Proxy', http_proxy)
 		ftp_proxy = apt_pkg.config.find('Acquire::ftp::Proxy')
@@ -78,15 +80,14 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 		"""Start async downloads."""
 		if not self.pkgs:
 			return True
-		concurrent = min(guess_concurrent(self.pkg_urls), 16)
-		semaphore = Semaphore(concurrent)
+		semaphore = Semaphore(min(guess_concurrent(self.pkg_urls), 16))
 		with Live() as self.live:
 			async with AsyncClient(follow_redirects=True, timeout=20) as client:
-				self.live.update(self._gen_table(initial=True))
+				self.live.update(self._gen_table())
 				loop = asyncio.get_running_loop()
 				tasks = (
 					loop.create_task(
-						self._download(client, urls, semaphore)
+						self._init_download(client, urls, semaphore)
 					) for urls in self.pkg_urls
 				)
 				await gather(*tasks)
@@ -97,43 +98,53 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 					)
 				)
 
-	async def _download(self, client: AsyncClient,
+	async def _download(self,
+		client: AsyncClient, semaphore: Semaphore,
+		candidate: Version, url: str) -> int:
+		"""Download and write package."""
+		dest = PARTIAL_DIR / get_pkg_name(candidate)
+		total_data = 0
+		async with semaphore:
+			vprint(
+				color('Starting Download: ', 'BLUE')
+				+f"{url} {unit_str(candidate.size, 1)}"
+			)
+			assert isinstance(url, str)
+			async with client.stream('GET', url) as response:
+				async with aiofiles.open(dest, mode="wb") as file:
+					async for data in response.aiter_bytes():
+						if data:
+							await file.write(data)
+							len_data = len(data)
+							total_data += len_data
+							await self._update_progress(len_data)
+		return total_data
+
+	async def _init_download(self, client: AsyncClient,
 		urls: list[Version | str], semaphore: Semaphore) -> None:
 		"""Download pkgs."""
 		candidate = urls.pop(0)
 		assert isinstance(candidate, Version)
-		dest = PARTIAL_DIR / get_pkg_name(candidate)
 		for num, url in enumerate(urls):
 			try:
-				async with semaphore:
-					vprint(
-						color('Starting Download: ', 'BLUE')
-						+f"{url} {unit_str(candidate.size, 1)}")
-					assert isinstance(url, str)
-					async with client.stream('GET', url) as response:
-						async with aiofiles.open(dest, mode="wb") as file:
-							async for data in response.aiter_bytes():
-								if data:
-									await file.write(data)
+				total_data = await self._download(client, semaphore, candidate, url)
 
 				if not check_pkg(PARTIAL_DIR, candidate):
+					await self._update_progress(total_data, failed=True)
 					continue
 
 				vprint(
 					color('Download Complete: ', 'GREEN')
 					+url
 				)
-				await self._update_progress(dest.name, candidate.size)
+
+				self.count += 1
+				self.last_completed = Path(candidate.filename).name
+				self.live.update(self._gen_table())
 				break
 
-			except ConnectTimeout:
-				print(color('Mirror Timedout:', 'YELLOW'), url)
-				check_index(num, urls, candidate)
-				continue
 			except (HTTPStatusError, RequestError, OSError) as error:
-				msg = str(error) or type(error).__name__
-				print(ERROR_PREFIX+msg)
-				check_index(num, urls, candidate)
+				download_error(error, num, urls, candidate)
 				continue
 
 	def _set_pkg_urls(self) -> None:
@@ -165,29 +176,31 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 			urls.append(uri)
 		return urls
 
-	def _gen_table(self, pkg_name: str = '', initial: bool = False) -> Table:
+	def _gen_table(self) -> Table:
 		"""Generate Rich Table."""
 		table = Table.grid()
 
 		table.add_row(
 			Text.from_ansi(f"{color('Total Packages:', 'GREEN')} {self.count}/{self.total_pkgs}")
 		)
-		if initial:
-			table.add_row(Spinner('dots', color('Starting Downloads...', 'BLUE')))
+		if not self.last_completed:
+			table.add_row(
+					Text.from_ansi(color('Starting Downloads...', 'BLUE'))
+			)
 		else:
-			table.add_row(Text.from_ansi(f"{color('Last Completed:', 'GREEN')} {pkg_name}"))
+			table.add_row(Text.from_ansi(f"{color('Last Completed:', 'GREEN')} {self.last_completed}"))
 		table.add_row(pkg_download_progress.get_renderable())
 		return Panel(
 			table, title='[bold white]Downloading...', title_align='left', border_style='bold green'
 		)
 
-	async def _update_progress(self, pkg_name: str, size: int) -> None:
+	async def _update_progress(self, len_data: int, failed: bool = False) -> None:
 		"""Update download progress."""
-		pkg_download_progress.advance(self.task, advance=size)
-		self.count += 1
-		self.live.update(
-			self._gen_table(pkg_name)
-		)
+		if failed:
+			len_data = -len_data
+
+		pkg_download_progress.advance(self.task, advance=len_data)
+		self.live.update(self._gen_table())
 
 async def process_downloads(pkg: Package) -> bool:
 	"""Process the downloaded packages."""
@@ -198,16 +211,32 @@ async def process_downloads(pkg: Package) -> bool:
 		dprint(f'Moving {source} -> {destination}')
 		source.rename(destination)
 	except OSError as error:
-		print(ERROR_PREFIX+f"Failed to move archive file {error}")
+		print(
+			ERROR_PREFIX+"Failed to move archive file, "
+			f"{error.strerror}: '{error.filename}' -> '{error.filename2}'"
+		)
 		return False
 	return True
 
-def check_index(num: int, urls: list[Version | str], candidate: Version) -> None:
-	"""Check if there is more urls in the list."""
+def download_error(
+	error: HTTPStatusError | RequestError | OSError,
+	num: int, urls: list[Version | str], candidate: Version) -> None:
+	"""Handle download errors."""
+	if isinstance(error, ConnectTimeout):
+		print(color('Mirror Timedout:', 'YELLOW'), urls[num])
+	else:
+		print(error.args)
+		msg = str(error) or type(error).__name__
+		print(ERROR_PREFIX + msg)
+
 	try:
+		# Check if there is another url to try
 		next_url = urls[num+1]
 	except IndexError:
-		print('No more mirrors for...', Path(candidate.filename).name)
+		print(
+			color('No More Mirrors:', 'RED'),
+			color(Path(candidate.filename).name, 'YELLOW')
+		)
 		return
 	print(color('Trying:', 'YELLOW'), next_url)
 
