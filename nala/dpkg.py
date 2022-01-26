@@ -546,7 +546,7 @@ def slice_list() -> None:
 		total = size - max(scroll_lines, 10)
 		scroll_list = scroll_list[total:]
 
-def scroll_bar(self: UpdateProgress | InstallProgress,
+def scroll_bar(self: UpdateProgress | InstallProgress, # pylint: disable=too-many-arguments
 	msg: str = '', install: bool = True, fetch: bool = False,
 	update_spinner: bool = False, use_bar: bool = True) -> None:
 	"""Print msg to our scroll bar live display."""
