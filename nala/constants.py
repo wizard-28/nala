@@ -110,8 +110,6 @@ SPAM = (
 	'Selecting previously unselected package', # 'Selecting previously unselected package chafa.'
 	'Preparing to unpack', # 'Preparing to unpack .../2-chafa_1.8.0-1_amd64.deb ...'
 	'Extracting templates from packages:',
-	'Preconfiguring packages',
-	'Reloading AppArmor profiles',
 )
 DPKG_STATUS = (
 	b'Scanning processes...',
