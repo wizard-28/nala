@@ -183,13 +183,17 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 		"""Generate Rich Table."""
 		table = Table.grid()
 
-		table.add_row(Text.from_ansi(f"{color('Total Packages:', 'GREEN')} {self.count}/{self.total_pkgs}"))
+		table.add_row(
+			Text.from_ansi(f"{color('Total Packages:', 'GREEN')} {self.count}/{self.total_pkgs}")
+		)
 		if initial:
 			table.add_row(Spinner('dots', color('Starting Downloads...', 'BLUE')))
 		else:
 			table.add_row(Text.from_ansi(f"{color('Last Completed:', 'GREEN')} {pkg_name}"))
 		table.add_row(pkg_download_progress.get_renderable())
-		return Panel(table, title='[bold white]Downloading...', title_align='left', border_style='bold green')
+		return Panel(
+			table, title='[bold white]Downloading...', title_align='left', border_style='bold green'
+		)
 
 	async def _update_progress(self, pkg_name: str, size: int) -> None:
 		"""Update download progress."""
