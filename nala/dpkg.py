@@ -518,6 +518,9 @@ def get_title(install: bool, fetch: bool) -> str:
 			return '[bold white]Updating Packages'
 		if arguments.command == 'install':
 			return '[bold white]Installing Packages'
+		if arguments.command == 'history':
+			title = f'History {str(arguments.mode).capitalize()} {arguments.id}'
+			return '[bold white]' + title
 	if install and fetch:
 		return '[bold white]Fetching Missed Packages'
 	return '[bold white]Updating Package List'
