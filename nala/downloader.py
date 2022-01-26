@@ -42,8 +42,7 @@ from httpx import (AsyncClient, ConnectTimeout,
 from rich.panel import Panel
 
 from nala.constants import ARCHIVE_DIR, ERROR_PREFIX, PARTIAL_DIR
-from nala.rich import (Live, Spinner, Table,
-				Text, pkg_download_progress, remaining)
+from nala.rich import Live, Spinner, Table, Text, pkg_download_progress
 from nala.utils import (check_pkg, color, dprint,
 				get_pkg_name, pkg_candidate, unit_str, vprint)
 
@@ -94,22 +93,9 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 
 				return all(
 					await gather(
-						*(self.process_downloads(pkg) for pkg in self.pkgs)
+						*(process_downloads(pkg) for pkg in self.pkgs)
 					)
 				)
-
-	async def process_downloads(self, pkg: Package) -> bool:
-		"""Process the downloaded packages."""
-		filename = get_pkg_name(pkg_candidate(pkg))
-		destination = ARCHIVE_DIR / filename
-		source = PARTIAL_DIR / filename
-		try:
-			dprint(f'Moving {source} -> {destination}')
-			source.rename(destination)
-		except OSError as error:
-			print(ERROR_PREFIX+f"Failed to move archive file {error}")
-			return False
-		return True
 
 	async def _download(self, client: AsyncClient,
 		urls: list[Version | str], semaphore: Semaphore) -> None:
@@ -202,6 +188,19 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 		self.live.update(
 			self._gen_table(pkg_name)
 		)
+
+async def process_downloads(pkg: Package) -> bool:
+	"""Process the downloaded packages."""
+	filename = get_pkg_name(pkg_candidate(pkg))
+	destination = ARCHIVE_DIR / filename
+	source = PARTIAL_DIR / filename
+	try:
+		dprint(f'Moving {source} -> {destination}')
+		source.rename(destination)
+	except OSError as error:
+		print(ERROR_PREFIX+f"Failed to move archive file {error}")
+		return False
+	return True
 
 def check_index(num: int, urls: list[Version | str], candidate: Version) -> None:
 	"""Check if there is more urls in the list."""

@@ -88,11 +88,6 @@ bar_back_style = Style(color='red')
 bar_style = Style(color='cyan')
 console = Console()
 
-remaining = Progress(
-	TextColumn("[bold green]Time Remaining:"),
-	TimeRemaining(),
-)
-
 pkg_download_progress = Progress(
 	TextColumn("[bold green]Time Remaining:"),
 	TimeRemaining(),
