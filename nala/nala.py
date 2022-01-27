@@ -210,7 +210,7 @@ class Nala:
 		if arguments.download_only:
 			print("Download complete and in download only mode.")
 		else:
-			write_history(delete_names, install_names, upgrade_names)
+			write_history(delete_names+autoremove_names, install_names, upgrade_names)
 			write_log(delete_names, install_names, upgrade_names, autoremove_names)
 			self.start_dpkg(pkg_total)
 
