@@ -38,8 +38,8 @@ from typing import Pattern
 import aiofiles
 import apt_pkg
 from apt.package import Package, Version
-from httpx import (AsyncClient, ConnectTimeout,
-				HTTPStatusError, RemoteProtocolError, RequestError, get)
+from httpx import (URL, AsyncClient, ConnectTimeout,
+				HTTPStatusError, Proxy, RemoteProtocolError, RequestError, get)
 from rich.panel import Panel
 
 from nala.constants import ARCHIVE_DIR, ERROR_PREFIX, PARTIAL_DIR
@@ -66,7 +66,8 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 		self.pkg_urls: list[list[Version | str]] = []
 		self._set_pkg_urls()
 		self.pkg_urls = sorted(self.pkg_urls, key=sort_pkg_size, reverse=True)
-		self.proxy: dict[str, str] = {}
+		#self.proxy: dict[str, str] = {}
+		self.proxy: dict[URL | str, URL | str | Proxy | None] = {}
 		self._set_proxy()
 
 	async def start_download(self) -> bool:
@@ -136,6 +137,7 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 		candidate = urls.pop(0)
 		assert isinstance(candidate, Version)
 		for num, url in enumerate(urls):
+			assert isinstance(url, str)
 			try:
 				total_data = await self._download(client, semaphore, candidate, url)
 
@@ -174,7 +176,7 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 		"""Set pkg_urls list."""
 		for pkg in self.pkgs:
 			candidate = pkg_candidate(pkg)
-			urls: list[str] = []
+			urls: list[Version | str] = []
 			urls.extend(self.filter_uris(candidate, MIRROR_PATTERN))
 			# Randomize the urls to minimize load on a single mirror.
 			shuffle(urls)
@@ -199,7 +201,7 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 			urls.append(uri)
 		return urls
 
-	def _gen_table(self) -> Table:
+	def _gen_table(self) -> Panel:
 		"""Generate Rich Table."""
 		table = Table.grid()
 

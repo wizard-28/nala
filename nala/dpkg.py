@@ -87,7 +87,7 @@ class UpdateProgress(text.AcquireProgress, base.OpProgress): # type: ignore[misc
 			self.old_op = self.op
 
 	# OpProgress Method
-	def done(self, _dummy_variable:None = None) -> None:
+	def done(self, _dummy_variable:None = None) -> None: # type: ignore[override]
 		"""Call once an operation has been completed."""
 		base.OpProgress.done(self)
 		if arguments.verbose:
@@ -207,7 +207,7 @@ class UpdateProgress(text.AcquireProgress, base.OpProgress): # type: ignore[misc
 		if self.fetched_bytes != 0:
 			self._write(self.final_msg())
 		# Delete the signal again.
-		signal.signal(signal.SIGWINCH, self._signal)
+		signal.signal(signal.SIGWINCH, self._signal) # type: ignore[arg-type]
 		self.live.stop()
 
 class InstallProgress(base.InstallProgress): # type: ignore[misc] # pylint: disable=too-many-instance-attributes
@@ -259,7 +259,7 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc] # pylint: disa
 
 		returns the result of calling `obj.do_install()`
 		"""
-		pid, self.child_fd = self.fork()
+		pid, self.child_fd = fork()
 		if pid == 0:
 			try:
 				# We ignore this with mypy because the attr is there
@@ -283,10 +283,6 @@ class InstallProgress(base.InstallProgress): # type: ignore[misc] # pylint: disa
 		with open(DPKG_LOG, 'w', encoding="utf-8") as self._dpkg_log:
 			self.child.interact(self.pre_filter)
 		return os.WEXITSTATUS(self.wait_child())
-
-	def fork(self) -> tuple[int, int]:
-		"""Fork pty or regular."""
-		return (os.fork(), 0) if arguments.raw_dpkg else pty.fork()
 
 	def wait_child(self) -> int:
 		"""Wait for child progress to exit."""
@@ -605,6 +601,10 @@ def setwinsize(file_descriptor: int, rows: int, cols: int) -> None:
 	# Note, assume ws_xpixel and ws_ypixel are zero.
 	size = struct.pack('HHHH', rows, cols, 0, 0)
 	fcntl.ioctl(file_descriptor, tiocswinz, size)
+
+def fork() -> tuple[int, int]:
+	"""Fork pty or regular."""
+	return (os.fork(), 0) if arguments.raw_dpkg else pty.fork()
 
 class AptExpect(fdspawn): # type: ignore[misc]
 	"""Subclass of fdspawn to add the interact method."""

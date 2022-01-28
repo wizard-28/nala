@@ -55,8 +55,8 @@ class Nala:
 	def __init__(self,	no_update: bool = False) -> None:
 		"""Manage Nala operations."""
 		self.purge = False
-		self.deleted: list[list[str]] = []
-		self.autoremoved: list[list[str]] = []
+		self.deleted: list[str] = []
+		self.autoremoved: list[str] = []
 		# If raw_dpkg is enabled likely they want to see the update too.
 		# Turn off Rich scrolling if we don't have XTERM.
 		if arguments.raw_dpkg or not term.is_xterm():
