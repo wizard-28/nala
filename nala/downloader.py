@@ -66,16 +66,8 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 		self.pkg_urls: list[list[Version | str]] = []
 		self._set_pkg_urls()
 		self.pkg_urls = sorted(self.pkg_urls, key=sort_pkg_size, reverse=True)
-
-		http_proxy = apt_pkg.config.find('Acquire::http::Proxy')
-		https_proxy = apt_pkg.config.find('Acquire::https::Proxy', http_proxy)
-		ftp_proxy = apt_pkg.config.find('Acquire::ftp::Proxy')
-
-		self.proxy: dict[str, str] = {
-			'http' : http_proxy,
-			'https' : https_proxy,
-			'ftp' : ftp_proxy
-		}
+		self.proxy: dict[str, str] = {}
+		self._set_proxy()
 
 	async def start_download(self) -> bool:
 		"""Start async downloads."""
@@ -83,7 +75,7 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 			return True
 		semaphore = Semaphore(min(guess_concurrent(self.pkg_urls), 16))
 		with Live() as self.live:
-			async with AsyncClient(follow_redirects=True, timeout=20) as client:
+			async with AsyncClient(follow_redirects=True, timeout=20, proxies=self.proxy) as client:
 				self.live.update(self._gen_table())
 				loop = asyncio.get_running_loop()
 				tasks = (
@@ -164,6 +156,19 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 			except (HTTPStatusError, RequestError, OSError) as error:
 				download_error(error, num, urls, candidate)
 				continue
+
+	def _set_proxy(self) -> None:
+		"""Set proxy configuration."""
+		http_proxy = apt_pkg.config.find('Acquire::http::Proxy')
+		https_proxy = apt_pkg.config.find('Acquire::https::Proxy', http_proxy)
+		ftp_proxy = apt_pkg.config.find('Acquire::ftp::Proxy')
+
+		if http_proxy:
+			self.proxy['http://'] = http_proxy
+		if https_proxy:
+			self.proxy['https://'] = https_proxy
+		if ftp_proxy:
+			self.proxy['ftp://'] = ftp_proxy
 
 	def _set_pkg_urls(self) -> None:
 		"""Set pkg_urls list."""
