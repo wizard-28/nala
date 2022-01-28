@@ -33,6 +33,7 @@ from typing import Any, NoReturn, Sequence
 from nala import __version__
 from nala.constants import LICENSE, THIRD_PARTY_LICENSES
 
+
 # Custom Parser for printing help on error.
 class NalaParser(argparse.ArgumentParser):
 	"""Subclass of ArgumentParser for better error."""
