@@ -95,21 +95,25 @@ class UpdateProgress(text.AcquireProgress, base.OpProgress): # type: ignore[misc
 				self._write(f"\r{self.old_op}... Done", True, True)
 			self.old_op = ""
 
+	def apt_write(self, msg: str, newline: bool = True, maximize: bool = False) -> None:
+		"""Write original apt update message."""
+		self._file.write("\r")
+		self._file.write(msg)
+
+		# Fill remaining stuff with whitespace
+		if self._width > len(msg):
+			self._file.write((self._width - len(msg)) * ' ')
+		elif maximize:  # Needed for OpProgress.
+			self._width = max(self._width, len(msg))
+		if newline:
+			self._file.write("\n")
+		else:
+			self._file.flush()
+
 	def _write(self, msg: str, newline: bool = True, maximize: bool = False) -> None:
 		"""Write the message on the terminal, fill remaining space."""
 		if arguments.raw_dpkg:
-			self._file.write("\r")
-			self._file.write(msg)
-
-			# Fill remaining stuff with whitespace
-			if self._width > len(msg):
-				self._file.write((self._width - len(msg)) * ' ')
-			elif maximize:  # Needed for OpProgress.
-				self._width = max(self._width, len(msg))
-			if newline:
-				self._file.write("\n")
-			else:
-				self._file.flush()
+			self.apt_write(msg, newline, maximize)
 			return
 
 		for item in ['Updated:', 'Ignored:', 'Error:', 'No Change:']:
@@ -122,19 +126,12 @@ class UpdateProgress(text.AcquireProgress, base.OpProgress): # type: ignore[misc
 					update_spinner=True, use_bar=False
 				)
 				break
-
 		else:
 			# For the pulse messages we need to do some formatting
 			# End of the line will look like '51.8 mB/s 2s'
 			if msg.endswith('s'):
-				pulse = msg.split()
-				last = len(pulse) - 1
-				fill = sum(len(line) for line in pulse) + last
-				# Set fill width to fit inside the rich panel
-				fill = ((self._width - fill) - 4 if arguments.verbose else
-				        (self._width - fill) - 6)
-				pulse.insert(last-2, ' '*fill)
-				msg = ' '.join(pulse)
+				msg = fill_pulse(msg.split())
+
 			if 'Fetched' in msg:
 				scroll_bar(self,
 					msg, install=self.install,
@@ -489,6 +486,24 @@ def format_version(match: list[str], line: str) -> str:
 			new_ver = re.sub(PARENTHESIS_PATTERN, paren_color, new_ver)
 			line = line.replace(ver, new_ver)
 	return line
+
+def fill_pulse(pulse: list[str]) -> str:
+	"""Fill the pulse message."""
+	last = len(pulse) - 1
+	fill = sum(len(line) for line in pulse) + last
+	# Set fill width to fit inside the rich panel
+	fill = ((term.columns - fill) - 5 if arguments.verbose else
+			(term.columns - fill) - 7)
+	# Make sure we insert the filler in the right spot
+	# In case of extra 1 min as shown below.
+	# ['2407', 'kB/s', '30s']
+	# ['895', 'kB/s', '1min', '18s']
+	index = last-2
+	if '/s' in pulse[index]:
+		index = last-3
+
+	pulse.insert(index, ' '*fill)
+	return ' '.join(pulse)
 
 def msg_formatter(line: str) -> str:
 	"""Format dpkg output."""
