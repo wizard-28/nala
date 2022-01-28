@@ -30,6 +30,7 @@ import asyncio
 import re
 import sys
 from asyncio import Semaphore, gather
+from errno import ENOENT
 from pathlib import Path
 from random import shuffle
 from typing import Pattern
@@ -38,7 +39,7 @@ import aiofiles
 import apt_pkg
 from apt.package import Package, Version
 from httpx import (AsyncClient, ConnectTimeout,
-				HTTPStatusError, RequestError, get)
+				HTTPStatusError, RemoteProtocolError, RequestError, get)
 from rich.panel import Panel
 
 from nala.constants import ARCHIVE_DIR, ERROR_PREFIX, PARTIAL_DIR
@@ -98,26 +99,43 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 					)
 				)
 
+	async def _stream_deb(self, client: AsyncClient, url: str, dest: Path) -> int:
+		"""Stream the deb package and write it to file."""
+		total_data = 0
+		async with client.stream('GET', url) as response:
+			async with aiofiles.open(dest, mode="wb") as file:
+				async for data in response.aiter_bytes():
+					if data:
+						await file.write(data)
+						len_data = len(data)
+						total_data += len_data
+						await self._update_progress(len_data)
+		return total_data
+
 	async def _download(self,
 		client: AsyncClient, semaphore: Semaphore,
 		candidate: Version, url: str) -> int:
 		"""Download and write package."""
 		dest = PARTIAL_DIR / get_pkg_name(candidate)
-		total_data = 0
 		async with semaphore:
 			vprint(
 				color('Starting Download: ', 'BLUE')
 				+f"{url} {unit_str(candidate.size, 1)}"
 			)
 			assert isinstance(url, str)
-			async with client.stream('GET', url) as response:
-				async with aiofiles.open(dest, mode="wb") as file:
-					async for data in response.aiter_bytes():
-						if data:
-							await file.write(data)
-							len_data = len(data)
-							total_data += len_data
-							await self._update_progress(len_data)
+			second_attempt = False
+			while True:
+				try:
+					total_data = await self._stream_deb(client, url, dest)
+					break
+				# Sometimes mirrors play a little dirty and close the connection
+				# Before we're done, so we catch this and try one more time.
+				except RemoteProtocolError as error:
+					if 'Server disconnected' not in str(error) or second_attempt:
+						raise error
+					mirror = url[:url.index('/pool')]
+					vprint(f"{ERROR_PREFIX}{mirror} {error}")
+					continue
 		return total_data
 
 	async def _init_download(self, client: AsyncClient,
@@ -211,10 +229,12 @@ async def process_downloads(pkg: Package) -> bool:
 		dprint(f'Moving {source} -> {destination}')
 		source.rename(destination)
 	except OSError as error:
-		print(
-			ERROR_PREFIX+"Failed to move archive file, "
-			f"{error.strerror}: '{error.filename}' -> '{error.filename2}'"
-		)
+		# We don't need to bug the user if the file doesn't exist, apt fetch will get it
+		if error.errno != ENOENT:
+			print(
+				ERROR_PREFIX+"Failed to move archive file, "
+				f"{error.strerror}: '{error.filename}' -> '{error.filename2}'"
+			)
 		return False
 	return True
 
@@ -225,7 +245,6 @@ def download_error(
 	if isinstance(error, ConnectTimeout):
 		print(color('Mirror Timedout:', 'YELLOW'), urls[num])
 	else:
-		print(error.args)
 		msg = str(error) or type(error).__name__
 		print(ERROR_PREFIX + msg)
 
