@@ -174,101 +174,69 @@ DPKG_MSG: dict[str, tuple[bytes, ...]] = {
 	'CONF_MESSAGE' : CONF_MESSAGE,
 	'CONF_ANSWER' : CONF_ANSWER,
 	'NOTICES' : NOTICES,
-	'DPKG_STATUS' : DPKG_STATUS,}
+	'DPKG_STATUS' : DPKG_STATUS,
+}
 
 THIRD_PARTY_LICENSES = (
-"""
+"""Nala is licensed under the GPLv3 or later.
+
+Additionally the Nala binary has 3rd party libraries compiled in.
+To comply with the terms of their licenses we include their copyright notice
+and the type of licence that the library uses.
+
+The full licence for each library can be found in:
+'/usr/share/doc/nala/licenses'
+
+After this page the full GPLv3 will be displayed.
+
 ==============================================================================
 PythonPing: https://github.com/alessandromaggio/pythonping
 ==============================================================================
 
-PythonPing is compiled into Nala using nuitka. As such we respect the license
-and include Alessandro's copyright notice along with a copy of the MIT License.
-
 MIT License
-
 Copyright (c) 2018 Alessandro Maggio
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
 ==============================================================================
-Rich Python library: https://github.com/Textualize/rich
+Rich: https://github.com/Textualize/rich
 ==============================================================================
 
-The Rich Python library is compiled into Nala using nuitka.
-As such we respect the license and include Will's copyright
-notice along with a copy of the MIT License.
-
+MIT License
 Copyright (c) 2020 Will McGugan
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
 ==============================================================================
-HTTPX Python library: https://github.com/encode/httpx
+HTTPX: https://github.com/encode/httpx
 ==============================================================================
 
-The HTTPX Python library is compiled into Nala using nuitka.
-As such we respect the license and include Encode OSS Ltd's copyright
-notice along with a copy of the BSD 3-Clause License.
-
+BSD 3-Clause License.
 Copyright © 2019, [Encode OSS Ltd](https://www.encode.io/).
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-  modification, are permitted provided that the following conditions are met:
+==============================================================================
+HTTP Core: https://github.com/encode/httpcore
+==============================================================================
 
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
+BSD 3-Clause License.
+Copyright © 2020, [Encode OSS Ltd](https://www.encode.io/).
 
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
+==============================================================================
+h11: https://github.com/python-hyper/h11
+==============================================================================
 
-* Neither the name of the copyright holder nor the names of its contributors
-  may be used to endorse or promote products derived from this software
-  without specific prior written permission.
+MIT License
+Copyright (c) 2016 Nathaniel J. Smith <njs@pobox.com> and other contributors
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
-THE POSSIBILITY OF SUCH DAMAGE."""
+==============================================================================
+charset_normalizer: https://github.com/Ousret/charset_normalizer
+==============================================================================
+
+MIT License
+Copyright (c) 2019 TAHRI Ahmed R.
+
+==============================================================================
+AnyIO: https://github.com/agronholm/anyio
+==============================================================================
+
+MIT License
+Copyright (c) 2018 Alex Grönholm
+
+"""
 )

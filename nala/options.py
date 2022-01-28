@@ -33,7 +33,6 @@ from typing import Any, NoReturn, Sequence
 from nala import __version__
 from nala.constants import LICENSE, THIRD_PARTY_LICENSES
 
-
 # Custom Parser for printing help on error.
 class NalaParser(argparse.ArgumentParser):
 	"""Subclass of ArgumentParser for better error."""
@@ -74,7 +73,7 @@ class GPLv3(argparse.Action):
 				pager(file.read())
 		else:
 			print('It seems the system has no license file')
-			print('Nala is licensed under the GPLv3')
+			print('The full GPLv3 can be found at:')
 			print('https://www.gnu.org/licenses/gpl-3.0.txt')
 		parser.exit()
 
