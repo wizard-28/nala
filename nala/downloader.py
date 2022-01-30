@@ -38,11 +38,12 @@ from typing import Pattern
 import aiofiles
 import apt_pkg
 from apt.package import Package, Version
-from httpx import (URL, AsyncClient, ConnectTimeout,
+from httpx import (URL, AsyncClient, ConnectError, ConnectTimeout,
 				HTTPStatusError, Proxy, RemoteProtocolError, RequestError, get)
 from rich.panel import Panel
 
-from nala.constants import ARCHIVE_DIR, ERROR_PREFIX, PARTIAL_DIR
+from nala.constants import (ARCHIVE_DIR,
+				ERRNO_PATTERN, ERROR_PREFIX, PARTIAL_DIR)
 from nala.rich import Live, Table, Text, pkg_download_progress
 from nala.utils import (check_pkg, color, dprint,
 				get_pkg_name, pkg_candidate, unit_str, vprint)
@@ -155,7 +156,7 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 				self.live.update(self._gen_table())
 				break
 
-			except (HTTPStatusError, RequestError, OSError) as error:
+			except (HTTPStatusError, RequestError, OSError, ConnectError) as error:
 				download_error(error, num, urls, candidate)
 				continue
 
@@ -246,11 +247,17 @@ async def process_downloads(pkg: Package) -> bool:
 	return True
 
 def download_error(
-	error: HTTPStatusError | RequestError | OSError,
+	error: HTTPStatusError | RequestError | OSError | ConnectError,
 	num: int, urls: list[Version | str], candidate: Version) -> None:
 	"""Handle download errors."""
+	full_url = str(urls[num])
+	mirror = full_url[:full_url.index('/pool')]
 	if isinstance(error, ConnectTimeout):
-		print(color('Mirror Timedout:', 'YELLOW'), urls[num])
+		print(color('Mirror Timedout:', 'YELLOW'), mirror)
+	if isinstance(error, ConnectError):
+		# ConnectError: [Errno -2] Name or service not known
+		errno_replace = re.sub(ERRNO_PATTERN, '', str(error)).strip()+':'
+		print(f"{color(errno_replace, 'RED')} {mirror}")
 	else:
 		msg = str(error) or type(error).__name__
 		print(ERROR_PREFIX + msg)

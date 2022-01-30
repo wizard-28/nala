@@ -36,7 +36,7 @@ from httpx import ConnectError, get
 from pythonping import ping
 from rich.progress import TaskID
 
-from nala.constants import ERROR_PREFIX, NALA_SOURCES
+from nala.constants import ERRNO_PATTERN, ERROR_PREFIX, NALA_SOURCES
 from nala.logger import dprint
 from nala.options import arguments, parser
 from nala.rich import Live, Table, fetch_progress
@@ -47,7 +47,6 @@ netselect_scored = []
 DEBIAN = 'Debian'
 UBUNTU = 'Ubuntu'
 DOMAIN_PATTERN = re.compile(r'https?://([A-Za-z_0-9.-]+).*')
-ERRNO_PATTERN = re.compile(r'\[.*\]')
 UBUNTU_COUNTRY = re.compile(r'<mirror:countrycode>(.*)</mirror:countrycode>')
 UBUNTU_MIRROR = re.compile(r'<link>(.*)</link>')
 

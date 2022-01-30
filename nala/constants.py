@@ -24,6 +24,7 @@
 """Module for file constants."""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import apt_pkg
@@ -68,6 +69,9 @@ SRCPKGCACHE = Path(apt_pkg.config.find_dir('Dir::Cache::srcpkgcache'))
 
 JSON_OPTIONS = jsbeautifier.BeautifierOptions(options={'indent_with_tabs' : True})
 ERROR_PREFIX = '\x1b[1;31mError: \x1b[0m'
+
+# Compiled Regex
+ERRNO_PATTERN = re.compile(r'\[.*\]')
 
 COLOR_CODES: dict[str, str | int] = {
 	'RESET' : '\x1b[0m',

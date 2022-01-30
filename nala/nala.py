@@ -216,33 +216,22 @@ class Nala:
 
 	def start_dpkg(self, pkg_total: int) -> None:
 		"""Set environment and start dpkg."""
-		# Lets get our environment variables set before we get down to business
-		if arguments.noninteractive:
-			environ["DEBIAN_FRONTEND"] = "noninteractive"
-		if arguments.noninteractive_full:
-			environ["DEBIAN_FRONTEND"] = "noninteractive"
-			apt_pkg.config.set('Dpkg::Options::', '--force-confdef')
-			apt_pkg.config.set('Dpkg::Options::', '--force-confold')
-		if arguments.no_aptlist:
-			environ["APT_LISTCHANGES_FRONTEND"] = "none"
-		if arguments.confdef:
-			apt_pkg.config.set('Dpkg::Options::', '--force-confdef')
-		if arguments.confold:
-			apt_pkg.config.set('Dpkg::Options::', '--force-confold')
-		if arguments.confnew:
-			apt_pkg.config.set('Dpkg::Options::', '--force-confnew')
-		if arguments.confmiss:
-			apt_pkg.config.set('Dpkg::Options::', '--force-confmiss')
-		if arguments.confask:
-			apt_pkg.config.set('Dpkg::Options::', '--force-confask')
-
+		set_env()
 		try:
 			self.cache.commit(
 				UpdateProgress(install=True),
 				InstallProgress(pkg_total)
 			)
-		except apt_pkg.Error as err:
-			sys.exit(f'\r\n{ERROR_PREFIX+str(err)}')
+
+		except apt_pkg.Error as error:
+			sys.exit(f'\r\n{ERROR_PREFIX+str(error)}')
+
+		except FetchFailedException as error:
+			# Apt sends us one big long string of errors separated by '\n'
+			for failed in str(error).splitlines():
+				print(ERROR_PREFIX+failed)
+			sys.exit(1)
+
 		finally:
 			term.restore_mode()
 			# If dpkg quits for any reason we lose the cursor
@@ -452,6 +441,27 @@ def transaction_summary(delete_header: str,
 	if autoremove_total:
 		table.add_row('Auto-Remove', str(autoremove_total), 'Packages')
 	term.console.print(table)
+
+def set_env() -> None:
+	"""Set environment."""
+	if arguments.noninteractive:
+		environ["DEBIAN_FRONTEND"] = "noninteractive"
+	if arguments.noninteractive_full:
+		environ["DEBIAN_FRONTEND"] = "noninteractive"
+		apt_pkg.config.set('Dpkg::Options::', '--force-confdef')
+		apt_pkg.config.set('Dpkg::Options::', '--force-confold')
+	if arguments.no_aptlist:
+		environ["APT_LISTCHANGES_FRONTEND"] = "none"
+	if arguments.confdef:
+		apt_pkg.config.set('Dpkg::Options::', '--force-confdef')
+	if arguments.confold:
+		apt_pkg.config.set('Dpkg::Options::', '--force-confold')
+	if arguments.confnew:
+		apt_pkg.config.set('Dpkg::Options::', '--force-confnew')
+	if arguments.confmiss:
+		apt_pkg.config.set('Dpkg::Options::', '--force-confmiss')
+	if arguments.confask:
+		apt_pkg.config.set('Dpkg::Options::', '--force-confask')
 
 def apt_error(apt_err: FetchFailedException | LockFailedException) -> NoReturn:
 	"""Take an error message from python-apt and formats it."""

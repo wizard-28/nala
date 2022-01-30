@@ -155,7 +155,8 @@ class UpdateProgress(text.AcquireProgress, base.OpProgress): # type: ignore[misc
 		if item.owner.status == item.owner.STAT_DONE:
 			self._write(f"{color('Ignored:  ', 'YELLOW')} {item.description}")
 		else:
-			self._write(ERROR_PREFIX+item.description)
+			# spaces are to make the error message consistent with other messages.
+			self._write(ERROR_PREFIX+'    '+item.description)
 			self._write(f"  {item.owner.error_text}")
 
 	def fetch(self, item: apt_pkg.AcquireItemDesc) -> None:
