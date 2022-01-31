@@ -32,7 +32,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from apt_pkg import get_architectures
 from aptsources.distro import get_distro
-from httpx import ConnectError, get
+from httpx import HTTPError, get
 from pythonping import ping
 from rich.progress import TaskID
 
@@ -156,7 +156,7 @@ def fetch_mirrors(url: str, splitter: str) -> tuple[str, ...]:
 	"""Attempt to fetch the url and split a list based on the splitter."""
 	try:
 		mirror_list = get(url, timeout=15).text.split(splitter)
-	except ConnectError:
+	except HTTPError:
 		sys.exit(ERROR_PREFIX+f'unable to connect to {url}')
 	return tuple(mirror_list)
 

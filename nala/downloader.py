@@ -38,7 +38,7 @@ from typing import Pattern
 import aiofiles
 import apt_pkg
 from apt.package import Package, Version
-from httpx import (URL, AsyncClient, ConnectError, ConnectTimeout,
+from httpx import (URL, AsyncClient, ConnectError, ConnectTimeout, HTTPError,
 				HTTPStatusError, Proxy, RemoteProtocolError, RequestError, get)
 from rich.panel import Panel
 
@@ -156,7 +156,7 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 				self.live.update(self._gen_table())
 				break
 
-			except (HTTPStatusError, RequestError, OSError, ConnectError) as error:
+			except (HTTPError, OSError) as error:
 				download_error(error, num, urls, candidate)
 				continue
 
@@ -195,7 +195,7 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 				if not self.mirrors:
 					try:
 						self.mirrors = get(f"http://{domain}/mirrors.txt").text.splitlines()
-					except (HTTPStatusError, RequestError, ConnectError):
+					except HTTPError:
 						sys.exit(ERROR_PREFIX+f'unable to connect to http://{domain}/mirrors.txt')
 				urls.extend([link+candidate.filename for link in self.mirrors])
 				continue
@@ -247,7 +247,7 @@ async def process_downloads(pkg: Package) -> bool:
 	return True
 
 def download_error(
-	error: HTTPStatusError | RequestError | OSError | ConnectError,
+	error: HTTPError | HTTPStatusError | RequestError | OSError | ConnectError,
 	num: int, urls: list[Version | str], candidate: Version) -> None:
 	"""Handle download errors."""
 	full_url = str(urls[num])
