@@ -83,9 +83,15 @@ class Nala:
 		packages = self.cache.keys()
 		new_packages: list[str] = []
 
+		glob_failed = False
 		for pkg_name in pkg_names:
 			if '*' in pkg_name:
 				dprint(f'Globbing: {pkg_name}')
+				glob = fnmatch.filter(packages, pkg_name)
+				if not glob:
+					glob_failed = True
+					print(ERROR_PREFIX+f"unable to find any packages by globbing {color(pkg_name, 'YELLOW')}")
+					continue
 				new_packages.extend(
 					fnmatch.filter(packages, pkg_name)
 				)
@@ -93,6 +99,8 @@ class Nala:
 				new_packages.append(pkg_name)
 
 		dprint(f'List after globbing: {new_packages}')
+		if glob_failed:
+			sys.exit(1)
 		return new_packages
 
 	def install(self, pkg_names: list[str]) -> None:
