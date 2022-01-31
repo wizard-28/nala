@@ -109,7 +109,7 @@ pkg_download_progress = Progress(
 	)
 
 dpkg_progress = Progress(
-	SpinnerColumn(style="bold white"),
+	SpinnerColumn(style="bold white", finished_text="[bold green]:heavy_check_mark:"),
 	TextColumn("[bold blue]Running dpkg ...", justify="right"),
 	BarColumn(
 		bar_width=None,
