@@ -195,7 +195,7 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 				if not self.mirrors:
 					try:
 						self.mirrors = get(f"http://{domain}/mirrors.txt").text.splitlines()
-					except ConnectionError:
+					except (HTTPStatusError, RequestError, ConnectError):
 						sys.exit(ERROR_PREFIX+f'unable to connect to http://{domain}/mirrors.txt')
 				urls.extend([link+candidate.filename for link in self.mirrors])
 				continue
