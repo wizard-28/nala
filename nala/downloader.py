@@ -228,26 +228,26 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 		full_url = str(urls[num])
 		mirror = full_url[:full_url.index('/pool')]
 		if isinstance(error, ConnectTimeout):
-			print(color('Mirror Timedout:', 'YELLOW'), mirror)
+			vprint(color('Mirror Timedout: ', 'YELLOW') + mirror)
 		if isinstance(error, ConnectError):
 			# ConnectError: [Errno -2] Name or service not known
 			errno_replace = re.sub(ERRNO_PATTERN, '', str(error)).strip()+':'
-			print(f"{color(errno_replace, 'RED')} {mirror}")
+			vprint(f"{color(errno_replace, 'RED')} {mirror}")
 		else:
 			msg = str(error) or type(error).__name__
-			print(ERROR_PREFIX + msg)
+			vprint(ERROR_PREFIX + msg)
 
 		try:
 			# Check if there is another url to try
 			next_url = urls[num+1]
 		except IndexError:
-			print(
-				color('No More Mirrors:', 'RED'),
-				color(pkg_name := Path(candidate.filename).name, 'YELLOW')
+			vprint(
+				color('No More Mirrors: ', 'RED')
+				+ color(pkg_name := Path(candidate.filename).name, 'YELLOW')
 			)
 			self.failed.append(pkg_name)
 			return
-		print(color('Trying:', 'YELLOW'), next_url)
+		vprint(color('Trying: ', 'YELLOW') + str(next_url))
 
 	async def _update_progress(self, len_data: int, failed: bool = False) -> None:
 		"""Update download progress."""

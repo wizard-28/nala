@@ -459,17 +459,22 @@ def set_env() -> None:
 	if arguments.confask:
 		apt_pkg.config.set('Dpkg::Options::', '--force-confask')
 
-def download(pkgs) -> None:
+def download(pkgs: list[Package]) -> None:
 	"""Run downloads and check for failures.
 
-	Does not return if in Download Only mode."""
+	Does not return if in Download Only mode.
+	"""
 	downloader = PkgDownloader(pkgs)
 	run(downloader.start_download())
 
 	if arguments.download_only:
 		if downloader.failed:
-			sys.exit('Some downloads failed and in download only mode.')
-		sys.exit("Download complete and in download only mode.")
+			for pkg in downloader.failed:
+				print(ERROR_PREFIX+f"{pkg} Failed to download")
+			sys.exit(ERROR_PREFIX+'Some downloads failed and in download only mode.')
+
+		print("Download complete and in download only mode.")
+		sys.exit(0)
 
 	if downloader.failed:
 		print("Some downloads failed. Falling back to apt_pkg.")
