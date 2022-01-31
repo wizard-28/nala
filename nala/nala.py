@@ -204,15 +204,11 @@ class Nala:
 				pkg for pkg in pkgs if not pkg.marked_delete and not check_pkg(ARCHIVE_DIR, pkg)
 			]
 
-		if not run(PkgDownloader(pkgs).start_download()):
-			print("Some downloads failed. apt_pkg will take care of them.")
+		download(pkgs)
 
-		if arguments.download_only:
-			print("Download complete and in download only mode.")
-		else:
-			write_history(delete_names+autoremove_names, install_names, upgrade_names)
-			write_log(delete_names, install_names, upgrade_names, autoremove_names)
-			self.start_dpkg(pkg_total)
+		write_history(delete_names+autoremove_names, install_names, upgrade_names)
+		write_log(delete_names, install_names, upgrade_names, autoremove_names)
+		self.start_dpkg(pkg_total)
 
 	def start_dpkg(self, pkg_total: int) -> None:
 		"""Set environment and start dpkg."""
@@ -462,6 +458,21 @@ def set_env() -> None:
 		apt_pkg.config.set('Dpkg::Options::', '--force-confmiss')
 	if arguments.confask:
 		apt_pkg.config.set('Dpkg::Options::', '--force-confask')
+
+def download(pkgs) -> None:
+	"""Run downloads and check for failures.
+
+	Does not return if in Download Only mode."""
+	downloader = PkgDownloader(pkgs)
+	run(downloader.start_download())
+
+	if arguments.download_only:
+		if downloader.failed:
+			sys.exit('Some downloads failed and in download only mode.')
+		sys.exit("Download complete and in download only mode.")
+
+	if downloader.failed:
+		print("Some downloads failed. Falling back to apt_pkg.")
 
 def apt_error(apt_err: FetchFailedException | LockFailedException) -> NoReturn:
 	"""Take an error message from python-apt and formats it."""
