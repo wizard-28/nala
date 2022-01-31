@@ -68,6 +68,7 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 		self._set_pkg_urls()
 		self.pkg_urls = sorted(self.pkg_urls, key=sort_pkg_size, reverse=True)
 		self.proxy: dict[URL | str, URL | str | Proxy | None] = {}
+		self.failed: list[str] = []
 		self._set_proxy()
 
 	async def start_download(self) -> bool:
@@ -155,7 +156,7 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 				break
 
 			except (HTTPError, OSError) as error:
-				download_error(error, num, urls, candidate)
+				self.download_error(error, num, urls, candidate)
 				continue
 
 	def _set_proxy(self) -> None:
@@ -220,6 +221,34 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 			table, title='[bold white]Downloading...', title_align='left', border_style='bold green'
 		)
 
+	def download_error(self,
+		error: HTTPError | HTTPStatusError | RequestError | OSError | ConnectError,
+		num: int, urls: list[Version | str], candidate: Version) -> None:
+		"""Handle download errors."""
+		full_url = str(urls[num])
+		mirror = full_url[:full_url.index('/pool')]
+		if isinstance(error, ConnectTimeout):
+			print(color('Mirror Timedout:', 'YELLOW'), mirror)
+		if isinstance(error, ConnectError):
+			# ConnectError: [Errno -2] Name or service not known
+			errno_replace = re.sub(ERRNO_PATTERN, '', str(error)).strip()+':'
+			print(f"{color(errno_replace, 'RED')} {mirror}")
+		else:
+			msg = str(error) or type(error).__name__
+			print(ERROR_PREFIX + msg)
+
+		try:
+			# Check if there is another url to try
+			next_url = urls[num+1]
+		except IndexError:
+			print(
+				color('No More Mirrors:', 'RED'),
+				color(pkg_name := Path(candidate.filename).name, 'YELLOW')
+			)
+			self.failed.append(pkg_name)
+			return
+		print(color('Trying:', 'YELLOW'), next_url)
+
 	async def _update_progress(self, len_data: int, failed: bool = False) -> None:
 		"""Update download progress."""
 		if failed:
@@ -245,33 +274,6 @@ async def process_downloads(pkg: Package) -> bool:
 			)
 		return False
 	return True
-
-def download_error(
-	error: HTTPError | HTTPStatusError | RequestError | OSError | ConnectError,
-	num: int, urls: list[Version | str], candidate: Version) -> None:
-	"""Handle download errors."""
-	full_url = str(urls[num])
-	mirror = full_url[:full_url.index('/pool')]
-	if isinstance(error, ConnectTimeout):
-		print(color('Mirror Timedout:', 'YELLOW'), mirror)
-	if isinstance(error, ConnectError):
-		# ConnectError: [Errno -2] Name or service not known
-		errno_replace = re.sub(ERRNO_PATTERN, '', str(error)).strip()+':'
-		print(f"{color(errno_replace, 'RED')} {mirror}")
-	else:
-		msg = str(error) or type(error).__name__
-		print(ERROR_PREFIX + msg)
-
-	try:
-		# Check if there is another url to try
-		next_url = urls[num+1]
-	except IndexError:
-		print(
-			color('No More Mirrors:', 'RED'),
-			color(Path(candidate.filename).name, 'YELLOW')
-		)
-		return
-	print(color('Trying:', 'YELLOW'), next_url)
 
 def guess_concurrent(pkg_urls: list[list[Version | str]]) -> int:
 	"""Determine how many concurrent downloads to do."""
