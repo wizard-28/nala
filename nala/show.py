@@ -53,17 +53,18 @@ def show_main(pkg: Package) -> None:
 
 def check_virtual(pkg_name: str, cache: Cache) -> None:
 	"""Check if the package is virtual."""
-	virtual = [
-		color(pkg.name, 'GREEN') for pkg in cache
-		if pkg_name in pkg_candidate(pkg).provides
-	]
-	if virtual:
+	if cache.is_virtual_package(pkg_name):
+		virtual = [
+			color(pkg.name, 'GREEN')
+			for pkg in cache.get_providing_packages(pkg_name)
+		]
 		print(
 			color(pkg_name, 'YELLOW'),
 			"is a virtual package satisfied by the following:\n"
 			f"{', '.join(virtual)}"
 		)
-		sys.exit(0)
+		return True
+	return False
 
 def show_related(candidate: Version) -> None:
 	"""Show relational packages."""

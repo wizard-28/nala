@@ -165,14 +165,22 @@ class Nala:
 	def show(self, pkg_names: list[str]) -> None:
 		"""Show package information."""
 		dprint(f"Show pkg_names: {pkg_names}")
+		not_found: list[str] = []
 		for num, pkg_name in enumerate(pkg_names):
 			if pkg_name in self.cache:
 				if num > 0:
 					print()
 				show_main(self.cache[pkg_name])
-			else:
-				check_virtual(pkg_name, self.cache)
-				sys.exit(f"{ERROR_PREFIX}{color(pkg_name, 'YELLOW')} not found")
+				continue
+
+			if check_virtual(pkg_name, self.cache):
+				continue
+			not_found.append(f"{ERROR_PREFIX}{color(pkg_name, 'YELLOW')} not found")
+
+		if not_found:
+			for error in not_found:
+				print(error)
+			sys.exit(1)
 
 	def auto_remover(self) -> None:
 		"""Handle auto removal of packages."""
