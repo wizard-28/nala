@@ -67,7 +67,6 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 		self.pkg_urls: list[list[Version | str]] = []
 		self._set_pkg_urls()
 		self.pkg_urls = sorted(self.pkg_urls, key=sort_pkg_size, reverse=True)
-		#self.proxy: dict[str, str] = {}
 		self.proxy: dict[URL | str, URL | str | Proxy | None] = {}
 		self._set_proxy()
 
@@ -76,9 +75,8 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 		if not self.pkgs:
 			return True
 		semaphore = Semaphore(min(guess_concurrent(self.pkg_urls), 16))
-		with Live() as self.live:
+		with Live(get_renderable=self._gen_table) as self.live:
 			async with AsyncClient(follow_redirects=True, timeout=20, proxies=self.proxy) as client:
-				self.live.update(self._gen_table())
 				loop = asyncio.get_running_loop()
 				tasks = (
 					loop.create_task(
@@ -215,6 +213,8 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 			)
 		else:
 			table.add_row(Text.from_ansi(f"{color('Last Completed:', 'GREEN')} {self.last_completed}"))
+
+		pkg_download_progress.advance(self.task, advance=0)
 		table.add_row(pkg_download_progress.get_renderable())
 		return Panel(
 			table, title='[bold white]Downloading...', title_align='left', border_style='bold green'
