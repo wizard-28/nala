@@ -42,6 +42,7 @@ from nala.constants import ARCHIVE_DIR, ERROR_PREFIX, NALA_DIR, PARTIAL_DIR
 from nala.downloader import PkgDownloader
 from nala.dpkg import InstallProgress, UpdateProgress
 from nala.history import write_history, write_log
+from nala.install import check_broken, install_main, print_broken
 from nala.options import arguments
 from nala.rich import Table
 from nala.show import additional_notice, check_virtual, show
@@ -106,30 +107,25 @@ class Nala:
 	def install(self, pkg_names: list[str]) -> None:
 		"""Install pkg[s]."""
 		dprint(f"Install pkg_names: {pkg_names}")
-		not_found = []
-
 		# We only want to glob if we detect an *
 		if '*' in str(pkg_names):
 			pkg_names = self.glob_filter(pkg_names)
 
-		for pkg_name in pkg_names:
-			if pkg_name not in self.cache:
-				not_found.append(pkg_name)
-			else:
-				pkg = self.cache[pkg_name]
-				if not pkg.installed:
-					pkg.mark_install()
-					dprint(f"Marked Install: {pkg.name}")
-				elif pkg.is_upgradable:
-					pkg.mark_upgrade()
-					dprint(f"Marked upgrade: {pkg.name}")
-				else:
-					print(f"Package {color(pkg.name, 'GREEN')}",
-					'is already at the latest version',
-					color(pkg.installed.version, 'BLUE'))
+		broken, not_found = check_broken(pkg_names, self.cache)
 
 		if not_found:
 			pkg_error(not_found, 'not found', terminate=True)
+
+		if not install_main(pkg_names, self.cache):
+			for pkg in broken:
+				if pkg.candidate is None:
+					for version in pkg.versions:
+						print_broken(pkg.name, version)
+				else:
+					print_broken(pkg.name, pkg.candidate)
+
+			print(f"{color('Notice:', 'YELLOW')} The information above may be able to help")
+			sys.exit(ERROR_PREFIX + 'You have held broken packages')
 
 		self.auto_remover()
 		self.get_changes()
