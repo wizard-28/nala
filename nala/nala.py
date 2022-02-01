@@ -44,7 +44,7 @@ from nala.dpkg import InstallProgress, UpdateProgress
 from nala.history import write_history, write_log
 from nala.options import arguments
 from nala.rich import Table
-from nala.show import check_virtual, show_main
+from nala.show import additional_notice, check_virtual, show
 from nala.utils import (ask, check_pkg, color, dprint, get_pkg_name,
 				pkg_candidate, pkg_installed, print_packages, term, unit_str)
 
@@ -166,16 +166,19 @@ class Nala:
 		"""Show package information."""
 		dprint(f"Show pkg_names: {pkg_names}")
 		not_found: list[str] = []
+		additional_records = 0
 		for num, pkg_name in enumerate(pkg_names):
 			if pkg_name in self.cache:
-				if num > 0:
-					print()
-				show_main(self.cache[pkg_name])
+				pkg = self.cache[pkg_name]
+				additional_records += show(num, pkg)
 				continue
 
 			if check_virtual(pkg_name, self.cache):
 				continue
 			not_found.append(f"{ERROR_PREFIX}{color(pkg_name, 'YELLOW')} not found")
+
+		if additional_records and not arguments.all_versions:
+			additional_notice(additional_records)
 
 		if not_found:
 			for error in not_found:

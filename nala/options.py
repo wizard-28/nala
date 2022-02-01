@@ -334,11 +334,19 @@ fetch_parser = subparsers.add_parser('fetch',
 remove_options(fetch_parser)
 remove_interactive_options(fetch_parser)
 
+# We do the same thing that we did with update options
+show_options = NalaParser(add_help=False)
+show_options.add_argument(
+	'-a', '--all-versions',
+	action='store_true',
+	help="Show all versions of a package."
+)
+
 # Parser for the show command
 show_parser = subparsers.add_parser(
 	'show',
 	help='show package details',
-	parents=[global_options, interactive_options],
+	parents=[show_options, global_options, interactive_options],
 	usage=f'{bin_name} show [--options] pkg1 [pkg2 ...]'
 )
 # Remove Global options that I don't want to see in show --help

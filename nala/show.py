@@ -24,7 +24,6 @@
 """Functions related to the `show` command."""
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from random import shuffle
 
@@ -32,12 +31,28 @@ from apt.cache import Cache
 from apt.package import BaseDependency, Dependency, Package, Version
 
 from nala.constants import PACSTALL_METADATA
-from nala.utils import color, pkg_candidate, unit_str
+from nala.options import arguments
+from nala.utils import color, unit_str
 
 
-def show_main(pkg: Package) -> None:
+def show(num: int, pkg: Package) -> int:
+	"""Orchestrate show command with support for all_versions."""
+	if num:
+		print()
+	versions = pkg.versions if arguments.all_versions else [pkg.candidate]
+	for ver_num, ver in enumerate(versions):
+		if ver is None:
+			print(color(pkg.name, 'YELLOW'), 'has no candidate')
+			continue
+		if ver_num and not num:
+			print()
+		show_main(ver)
+	# Minus one so we don't say there are one additional packages for only 1 package
+	return len(pkg.versions) - 1
+
+def show_main(candidate: Version) -> None:
 	"""Start show functions."""
-	candidate = pkg_candidate(pkg)
+	pkg = candidate.package
 	for pkg_info in show_format(pkg, candidate):
 		if pkg_info:
 			print(pkg_info)
@@ -51,7 +66,7 @@ def show_main(pkg: Package) -> None:
 	if candidate._translated_records:
 		print(color('Description:'), candidate._translated_records.long_desc)
 
-def check_virtual(pkg_name: str, cache: Cache) -> None:
+def check_virtual(pkg_name: str, cache: Cache) -> bool:
 	"""Check if the package is virtual."""
 	if cache.is_virtual_package(pkg_name):
 		virtual = [
@@ -245,3 +260,12 @@ def split_deps(depend_list: list[Dependency]) -> tuple[list[Dependency], list[De
 			continue
 		depends.append(depend)
 	return depends, pre_depends
+
+def additional_notice(additional_records: int) -> None:
+	"""Print notice of additional records."""
+	all_versions = color("'-a'", 'YELLOW')
+	print(
+		color('Notice:', 'YELLOW'),
+		f"There are {color(str(additional_records), 'YELLOW')} additional records.",
+		f"Please use the {all_versions} switch to see them."
+	)
