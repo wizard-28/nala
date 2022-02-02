@@ -25,10 +25,11 @@
 from __future__ import annotations
 
 import apt_pkg
-from apt import Package, Version, Cache
+from apt import Cache, Package, Version
 
-from nala.utils import color, dprint
 from nala.show import print_dep
+from nala.utils import color, dprint
+
 
 def install_main(pkg_names: list[str], cache: Cache) -> bool:
 	"""Mark pkg as install or upgrade."""
