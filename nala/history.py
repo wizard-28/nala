@@ -240,7 +240,6 @@ def get_history(hist_id: str) -> dict[str, str | list[str] | list[list[str]]]:
 	history_file: dict[str, dict[str, str | list[str] | list[list[str]]]] = (
 		json.loads(NALA_HISTORY.read_text(encoding='utf-8'))
 	)
-	transaction = history_file.get(hist_id)
-	if transaction:
+	if transaction := history_file.get(hist_id):
 		return transaction
 	sys.exit(ERROR_PREFIX+f"Transaction {hist_id} doesn't exist.")

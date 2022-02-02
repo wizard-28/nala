@@ -497,7 +497,7 @@ def download(pkgs: list[Package]) -> None:
 def apt_error(apt_err: FetchFailedException | LockFailedException) -> NoReturn:
 	"""Take an error message from python-apt and formats it."""
 	msg = str(apt_err)
-	if msg == '':
+	if not msg:
 		# Sometimes python apt gives us literally nothing to work with.
 		# Probably an issue with sources.list. Needs further testing.
 		sys.exit(

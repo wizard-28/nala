@@ -112,18 +112,14 @@ def show_related(candidate: Version) -> None:
 
 def additional_related(candidate: Version) -> None:
 	"""Show breaks, conflicts, replaces."""
-	breaks = candidate.get_dependencies('Breaks')
-	conflicts = candidate.get_dependencies('Conflicts')
-	replaces = candidate.get_dependencies('Replaces')
-
-	if replaces:
+	if replaces := candidate.get_dependencies('Replaces'):
 		print_dep(
 			color('Replaces:'),
 			[color(pkg[0].name, 'GREEN') for pkg in replaces],
 		)
-	if conflicts:
+	if conflicts := candidate.get_dependencies('Conflicts'):
 		print_dep(color('Conflicts:'), conflicts)
-	if breaks:
+	if breaks := candidate.get_dependencies('Breaks'):
 		print_dep(color('Breaks:'), breaks)
 
 def show_format(pkg: Package, candidate: Version) -> tuple[str, ...]:

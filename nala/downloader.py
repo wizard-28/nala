@@ -188,8 +188,7 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 		urls: list[str] = []
 		for uri in candidate.uris:
 			# Regex to check if we're using mirror.txt
-			regex = pattern.search(uri)
-			if regex:
+			if regex := pattern.search(uri):
 				domain = regex.group(1)
 				if not self.mirrors:
 					try:

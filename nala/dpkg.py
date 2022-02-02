@@ -516,8 +516,7 @@ def msg_formatter(line: str) -> str:
 	elif line.startswith('Processing'):
 		line = lines(line, 'Processing', 'GREEN')
 
-	match = re.findall(VERSION_PATTERN, line)
-	if match:
+	if match := re.findall(VERSION_PATTERN, line):
 		return format_version(match, line)
 	return line
 

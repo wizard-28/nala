@@ -196,8 +196,7 @@ def get_countries(master_mirror: tuple[str, ...]) -> tuple[str, ...]:
 			# Ubuntu Countries
 			elif '<mirror:countrycode>' in line:
 				# <mirror:countrycode>US</mirror:countrycode>
-				result = re.search(UBUNTU_COUNTRY, line)
-				if result:
+				if result := re.search(UBUNTU_COUNTRY, line):
 					country_list.add(result.group(1))
 	return tuple(country_list)
 
@@ -223,8 +222,7 @@ def ubuntu_parser(mirror: str) -> str | None:
 	for line in mirror.splitlines():
 		if '<link>' in line:
 			# <link>http://mirror.steadfastnet.com/ubuntu/</link>
-			result = re.search(UBUNTU_MIRROR, line)
-			if result:
+			if result := re.search(UBUNTU_MIRROR, line):
 				return result.group(1)
 	return None
 
