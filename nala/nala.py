@@ -79,37 +79,10 @@ class Nala:
 		self.auto_remover()
 		self.get_changes(upgrade=True)
 
-	def glob_filter(self, pkg_names: list[str]) -> list[str]:
-		"""Filter provided packages and glob *."""
-		packages = self.cache.keys()
-		new_packages: list[str] = []
-
-		glob_failed = False
-		for pkg_name in pkg_names:
-			if '*' in pkg_name:
-				dprint(f'Globbing: {pkg_name}')
-				glob = fnmatch.filter(packages, pkg_name)
-				if not glob:
-					glob_failed = True
-					print(ERROR_PREFIX+f"unable to find any packages by globbing {color(pkg_name, 'YELLOW')}")
-					continue
-				new_packages.extend(
-					fnmatch.filter(packages, pkg_name)
-				)
-			else:
-				new_packages.append(pkg_name)
-
-		dprint(f'List after globbing: {new_packages}')
-		if glob_failed:
-			sys.exit(1)
-		return new_packages
-
 	def install(self, pkg_names: list[str]) -> None:
 		"""Install pkg[s]."""
 		dprint(f"Install pkg_names: {pkg_names}")
-		# We only want to glob if we detect an *
-		if '*' in str(pkg_names):
-			pkg_names = self.glob_filter(pkg_names)
+		pkg_names = glob_filter(pkg_names, self.cache.keys())
 
 		broken, not_found = check_broken(pkg_names, self.cache)
 
@@ -137,9 +110,7 @@ class Nala:
 		not_installed: list[str] = []
 		self.purge = purge
 
-		# We only want to glob if we detect an *
-		if '*' in str(pkg_names):
-			pkg_names = self.glob_filter(pkg_names)
+		pkg_names = glob_filter(pkg_names, self.cache.keys())
 
 		for pkg_name in pkg_names:
 			if check_found(self.cache, pkg_name, not_found, not_installed):
@@ -493,6 +464,37 @@ def download(pkgs: list[Package]) -> None:
 
 	if downloader.failed:
 		print("Some downloads failed. Falling back to apt_pkg.")
+
+def glob_filter(pkg_names: list[str], cache_keys: list[str]) -> list[str]:
+	"""Filter provided packages and glob *.
+
+	Returns a new list of packages matching the glob.
+
+	If there is nothing to glob it returns the original list.
+	"""
+	if '*' not in str(pkg_names):
+		return pkg_names
+
+	new_packages: list[str] = []
+	glob_failed = False
+	for pkg_name in pkg_names:
+		if '*' in pkg_name:
+			dprint(f'Globbing: {pkg_name}')
+			glob = fnmatch.filter(cache_keys, pkg_name)
+			if not glob:
+				glob_failed = True
+				print(ERROR_PREFIX+f"unable to find any packages by globbing {color(pkg_name, 'YELLOW')}")
+				continue
+			new_packages.extend(
+				fnmatch.filter(cache_keys, pkg_name)
+			)
+		else:
+			new_packages.append(pkg_name)
+
+	dprint(f'List after globbing: {new_packages}')
+	if glob_failed:
+		sys.exit(1)
+	return new_packages
 
 def apt_error(apt_err: FetchFailedException | LockFailedException) -> NoReturn:
 	"""Take an error message from python-apt and formats it."""
