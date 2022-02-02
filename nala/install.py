@@ -28,7 +28,7 @@ import apt_pkg
 from apt import Cache, Package, Version
 
 from nala.show import print_dep
-from nala.utils import color, dprint
+from nala.utils import color, dprint, term
 
 
 def install_main(pkg_names: list[str], cache: Cache) -> bool:
@@ -79,15 +79,12 @@ def check_broken(pkg_names: list[str], cache: Cache) -> tuple[list[Package], lis
 
 def print_broken(pkg_name: str, candidate: Version) -> None:
 	"""Print broken packages information."""
-	conflicts = candidate.get_dependencies('Conflicts')
-	breaks = candidate.get_dependencies('Breaks')
-
+	print('='*term.columns)
 	version = color('(') + color(candidate.version, 'BLUE') + color(')')
 	print(f"{color('Package:', 'YELLOW')} {color(pkg_name, 'GREEN')} {version}")
-	if conflicts:
+	if conflicts := candidate.get_dependencies('Conflicts'):
 		print_dep(color('Conflicts:', 'YELLOW'), conflicts)
-	if breaks:
+	if breaks := candidate.get_dependencies('Breaks'):
 		print_dep(color('Breaks:', 'YELLOW'), breaks)
 	if candidate.dependencies:
 		print_dep(color('Depends:', 'YELLOW'), candidate.dependencies)
-	print()

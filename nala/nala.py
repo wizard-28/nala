@@ -124,7 +124,7 @@ class Nala:
 				else:
 					print_broken(pkg.name, pkg.candidate)
 
-			print(f"{color('Notice:', 'YELLOW')} The information above may be able to help")
+			print(f"\n{color('Notice:', 'YELLOW')} The information above may be able to help")
 			sys.exit(ERROR_PREFIX + 'You have held broken packages')
 
 		self.auto_remover()
