@@ -43,12 +43,6 @@ def install_main(pkg_names: list[str], cache: Cache) -> bool:
 					elif pkg.is_upgradable:
 						pkg.mark_upgrade()
 						dprint(f"Marked upgrade: {pkg.name}")
-					else:
-						print(
-							f"Package {color(pkg.name, 'GREEN')}",
-							'is already at the latest version',
-							color(pkg.installed.version, 'BLUE')
-						)
 				except apt_pkg.Error as error:
 					if ('broken packages' not in str(error)
 					and 'held packages' not in str(error)):
@@ -69,7 +63,14 @@ def check_broken(pkg_names: list[str], cache: Cache) -> tuple[list[Package], lis
 				not_found.append(pkg_name)
 			else:
 				pkg = cache[pkg_name]
-				depcache.mark_install(pkg._pkg, True, True)
+				if pkg.installed and not pkg.is_upgradable:
+					print(
+						f"Package {color(pkg.name, 'GREEN')}",
+						'is already at the latest version',
+						color(pkg.installed.version, 'BLUE')
+						)
+					continue
+				depcache.mark_install(pkg._pkg, False, True)
 				if depcache.broken_count > broken_count:
 					broken.append(pkg)
 					broken_count += 1
