@@ -115,7 +115,7 @@ global_options = NalaParser(add_help=False)
 global_options.add_argument(
 	'-y', '--assume-yes',
 	action='store_true',
-	help="assume 'yes' to all prompts and run non-interactively."
+	help="assume 'yes' to all prompts and run non-interactively"
 )
 global_options.add_argument(
 	'-d', '--download-only',
@@ -135,7 +135,7 @@ global_options.add_argument(
 global_options.add_argument(
 	'--no-autoremove',
 	action='store_true',
-	help='stops nala from autoremoving packages.'
+	help='stops nala from autoremoving packages'
 )
 global_options.add_argument(
 	'--raw-dpkg',
@@ -261,7 +261,7 @@ update_options = NalaParser(add_help=False)
 update_options.add_argument(
 	'--no-full',
 	action='store_false',
-	help="R|runs a normal upgrade instead of full-upgrade\n\n"
+	help="runs a normal upgrade instead of full-upgrade"
 )
 
 # Parser for the update/upgrade command
@@ -315,7 +315,7 @@ fetch_options.add_argument(
 fetch_options.add_argument(
 	'--foss',
 	action='store_true',
-	help="omits contrib and non-free repos\n\n"
+	help="omits contrib and non-free repos"
 )
 
 # Parser for the fetch command
@@ -339,7 +339,7 @@ show_options = NalaParser(add_help=False)
 show_options.add_argument(
 	'-a', '--all-versions',
 	action='store_true',
-	help="Show all versions of a package."
+	help="Show all versions of a package"
 )
 
 # Parser for the show command
@@ -407,7 +407,7 @@ history_parser.add_argument(
 # Parser for the show command
 clean_parser = subparsers.add_parser(
 	'clean',
-	help='clears out the local repository of retrieved package files.',
+	help='clears out the local repository of retrieved package files',
 	parents=[global_options],
 	usage=f'{bin_name} show [--options]'
 )
