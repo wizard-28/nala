@@ -81,7 +81,8 @@ def print_broken(pkg_name: str, candidate: Version) -> None:
 	conflicts = candidate.get_dependencies('Conflicts')
 	breaks = candidate.get_dependencies('Breaks')
 
-	print(f"{color('Package:', 'YELLOW')} {color(pkg_name, 'GREEN')} ({candidate.version})")
+	version = color('(') + color(candidate.version, 'BLUE') + color(')')
+	print(f"{color('Package:', 'YELLOW')} {color(pkg_name, 'GREEN')} {version}")
 	if conflicts:
 		print_dep(color('Conflicts:', 'YELLOW'), conflicts)
 	if breaks:
