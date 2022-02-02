@@ -32,20 +32,26 @@ from apt.package import BaseDependency, Dependency, Package, Version
 
 from nala.constants import PACSTALL_METADATA
 from nala.options import arguments
-from nala.utils import color, unit_str
+from nala.utils import color, term, unit_str
 
+
+def print_sep() -> None:
+	"""Print separator."""
+	print()
+	print('='*term.columns)
+	print()
 
 def show(num: int, pkg: Package) -> int:
 	"""Orchestrate show command with support for all_versions."""
 	if num:
-		print()
+		print_sep()
 	versions = pkg.versions if arguments.all_versions else [pkg.candidate]
 	for ver_num, ver in enumerate(versions):
 		if ver is None:
 			print(color(pkg.name, 'YELLOW'), 'has no candidate')
 			continue
 		if ver_num and not num:
-			print()
+			print_sep()
 		show_main(ver)
 	# Minus one so we don't say there are one additional packages for only 1 package
 	return len(pkg.versions) - 1
