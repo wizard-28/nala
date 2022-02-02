@@ -130,6 +130,7 @@ def show_format(pkg: Package, candidate: Version) -> tuple[str, ...]:
 	"""Format main section for show command."""
 	installed = 'yes' if pkg.is_installed else 'no'
 	essential = 'yes' if pkg.essential else 'no'
+	maintainer = format_maintainer(str(candidate.record.get('Maintainer')).split())
 	original_maintainer, bugs, origin, installed_size = filter_empty(candidate)
 
 	return (
@@ -142,15 +143,27 @@ def show_format(pkg: Package, candidate: Version) -> tuple[str, ...]:
 		f"{color('Section:')} {candidate.section}",
 		f"{color('Source:')} {candidate.source_name}",
 		origin,
-		f"{color('Maintainer:')} {candidate.record.get('Maintainer')}",
+		f"{color('Maintainer:')} {maintainer}",
 		original_maintainer,
 		bugs,
 		installed_size,
 	)
 
+def format_maintainer(maintainer: list[str]) -> str:
+	"""Format email in maintainer line."""
+	maint_list = []
+	for line in maintainer:
+		if '>' in line:
+			line = color(line[1:-1], 'BLUE')
+			line = color('<') + line + color('>')
+		maint_list.append(line)
+	return ' '.join(maint_list)
+
 def filter_empty(candidate: Version) -> tuple[str, str, str, str]:
 	"""Filter empty information blocks."""
 	original_maintainer = candidate.record.get('Original-Maintainer')
+	if original_maintainer:
+		original_maintainer = format_maintainer(str(original_maintainer).split())
 	bugs = candidate.record.get('Bugs')
 	origin = candidate.origins[0].origin
 	installed_size = candidate.installed_size
