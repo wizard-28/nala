@@ -220,10 +220,9 @@ def ubuntu_parser(mirror: str) -> str | None:
 		return None
 
 	for line in mirror.splitlines():
-		if '<link>' in line:
-			# <link>http://mirror.steadfastnet.com/ubuntu/</link>
-			if result := re.search(UBUNTU_MIRROR, line):
-				return result.group(1)
+		# <link>http://mirror.steadfastnet.com/ubuntu/</link>
+		if result := re.search(UBUNTU_MIRROR, line):
+			return result.group(1)
 	return None
 
 def detect_release() -> tuple[str, str]:
