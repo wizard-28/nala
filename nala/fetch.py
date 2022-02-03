@@ -274,15 +274,15 @@ def check_supported(distro:str, release:str,
 	if distro == DEBIAN:
 		component = 'main' if arguments.foss else 'main contrib non-free'
 		return debian_mirror(country_list), component
-	if distro == UBUNTU:
+	if distro in (UBUNTU, 'Pop'):
 		# It's ubuntu, you probably don't care about foss
 		return ubuntu_mirror(country_list), 'main restricted universe multiverse'
-	parser.parse_args(['fetch', '--help'])
 	print(
 		ERROR_PREFIX+f"{distro} {release} is unsupported.\n"
 		"You can specify Ubuntu or Debian manually."
 	)
-	sys.exit(ERROR_PREFIX+f"{distro} {release} is unsupported.")
+	parser.parse_args(['fetch', '--help'])
+	sys.exit(1)
 
 def fetch_checks() -> None:
 	"""Perform checks and error if we shouldn't continue."""
