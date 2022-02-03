@@ -29,7 +29,7 @@ from __future__ import annotations
 import errno
 import fnmatch
 import sys
-from asyncio import run
+from asyncio import CancelledError, run
 from copy import deepcopy
 from os import environ
 from typing import NoReturn
@@ -451,7 +451,12 @@ def download(pkgs: list[Package]) -> None:
 	Does not return if in Download Only mode.
 	"""
 	downloader = PkgDownloader(pkgs)
-	run(downloader.start_download())
+	try:
+		run(downloader.start_download())
+	except CancelledError as error:
+		if downloader.exit:
+			sys.exit(downloader.exit)
+		raise error
 
 	if arguments.download_only:
 		if downloader.failed:

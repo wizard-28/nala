@@ -78,6 +78,12 @@ HANDLER = Union[Callable[[int, Optional[FrameType]], Any], int, Handlers, None]
 # Compiled Regex
 ERRNO_PATTERN = re.compile(r'\[.*\]')
 
+class ExitCode: # pylint: disable=too-few-public-methods
+	"""Constants for Exit Codes."""
+
+	SIGINT = 130
+	SIGTERM = 143
+
 COLOR_CODES: dict[str, str | int] = {
 	'RESET' : '\x1b[0m',
 	'RED' : 31,

@@ -29,10 +29,12 @@ from __future__ import annotations
 import asyncio
 import re
 import sys
-from asyncio import Semaphore, gather
+from asyncio import AbstractEventLoop, Semaphore, gather
 from errno import ENOENT
+from functools import partial
 from pathlib import Path
 from random import shuffle
+from signal import SIGINT, SIGTERM, Signals
 from typing import Pattern
 
 import aiofiles
@@ -42,11 +44,11 @@ from httpx import (URL, AsyncClient, ConnectError, ConnectTimeout, HTTPError,
 				HTTPStatusError, Proxy, RemoteProtocolError, RequestError, get)
 from rich.panel import Panel
 
-from nala.constants import (ARCHIVE_DIR,
-				ERRNO_PATTERN, ERROR_PREFIX, PARTIAL_DIR)
+from nala.constants import (ARCHIVE_DIR, ERRNO_PATTERN,
+				ERROR_PREFIX, PARTIAL_DIR, ExitCode)
 from nala.rich import Live, Table, Text, pkg_download_progress
 from nala.utils import (check_pkg, color, dprint,
-				get_pkg_name, pkg_candidate, unit_str, vprint)
+				get_pkg_name, pkg_candidate, term, unit_str, vprint)
 
 MIRROR_PATTERN = re.compile(r'mirror://([A-Za-z_0-9.-]+).*')
 
@@ -69,6 +71,7 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 		self.pkg_urls = sorted(self.pkg_urls, key=sort_pkg_size, reverse=True)
 		self.proxy: dict[URL | str, URL | str | Proxy | None] = {}
 		self.failed: list[str] = []
+		self.exit: int | bool = False
 		self._set_proxy()
 
 	async def start_download(self) -> bool:
@@ -84,6 +87,11 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 						self._init_download(client, urls, semaphore)
 					) for urls in self.pkg_urls
 				)
+				# Setup handlers for Interrupts
+				for signal_enum in (SIGINT, SIGTERM):
+					exit_func = partial(self.interrupt, signal_enum, loop)
+					loop.add_signal_handler(signal_enum, exit_func)
+
 				return all(await gather(*tasks))
 
 	async def _stream_deb(self, client: AsyncClient, url: str, dest: Path) -> int:
@@ -155,6 +163,17 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 			except (HTTPError, OSError) as error:
 				self.download_error(error, num, urls, candidate)
 				continue
+
+	def interrupt(self, signal_enum: Signals, loop: AbstractEventLoop) -> None:
+		"""Shutdown the loop."""
+		self.exit = 128+signal_enum.real
+		if self.exit == ExitCode.SIGINT:
+			term.write(term.CURSER_UP+term.CLEAR_LINE)
+
+		self.live.stop()
+		for task in asyncio.all_tasks(loop):
+			task.cancel()
+		print(f'Exiting due to {signal_enum.name}')
 
 	def _set_proxy(self) -> None:
 		"""Set proxy configuration."""
