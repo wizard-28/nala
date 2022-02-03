@@ -84,13 +84,7 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 						self._init_download(client, urls, semaphore)
 					) for urls in self.pkg_urls
 				)
-				await gather(*tasks)
-
-				return all(
-					await gather(
-						*(process_downloads(pkg) for pkg in self.pkgs)
-					)
-				)
+				return all(await gather(*tasks))
 
 	async def _stream_deb(self, client: AsyncClient, url: str, dest: Path) -> int:
 		"""Stream the deb package and write it to file."""
@@ -141,7 +135,10 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 			try:
 				total_data = await self._download(client, semaphore, candidate, url)
 
-				if not check_pkg(PARTIAL_DIR, candidate):
+				if not await process_downloads(candidate):
+					await self._update_progress(total_data, failed=True)
+					continue
+				if not check_pkg(ARCHIVE_DIR, candidate):
 					await self._update_progress(total_data, failed=True)
 					continue
 
@@ -256,9 +253,9 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 		pkg_download_progress.advance(self.task, advance=len_data)
 		self.live.update(self._gen_table())
 
-async def process_downloads(pkg: Package) -> bool:
+async def process_downloads(candidate: Version) -> bool:
 	"""Process the downloaded packages."""
-	filename = get_pkg_name(pkg_candidate(pkg))
+	filename = get_pkg_name(candidate)
 	destination = ARCHIVE_DIR / filename
 	source = PARTIAL_DIR / filename
 	try:
