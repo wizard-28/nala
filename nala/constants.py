@@ -26,6 +26,9 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from signal import Handlers
+from types import FrameType
+from typing import Any, Callable, Optional, Union
 
 import apt_pkg
 import jsbeautifier
@@ -69,6 +72,8 @@ SRCPKGCACHE = Path(apt_pkg.config.find_dir('Dir::Cache::srcpkgcache'))
 
 JSON_OPTIONS = jsbeautifier.BeautifierOptions(options={'indent_with_tabs' : True})
 ERROR_PREFIX = '\x1b[1;31mError: \x1b[0m'
+
+HANDLER = Union[Callable[[int, Optional[FrameType]], Any], int, Handlers, None]
 
 # Compiled Regex
 ERRNO_PATTERN = re.compile(r'\[.*\]')

@@ -39,7 +39,7 @@ from nala.constants import (ERROR_PREFIX,
 				JSON_OPTIONS, NALA_HISTORY, NALA_LOGFILE)
 from nala.logger import dprint
 from nala.rich import Column, Table, console
-from nala.utils import print_packages, term
+from nala.utils import DelayedKeyboardInterrupt, print_packages, term
 
 if TYPE_CHECKING:
 	from nala.nala import Nala
@@ -63,8 +63,9 @@ def load_history_file() -> dict[str, dict[str, str | list[str] | list[list[str]]
 
 def write_history_file(data: dict[str, dict[str, str | list[str] | list[list[str]]]]) -> None:
 	"""Write history to file."""
-	with open(NALA_HISTORY, 'w', encoding='utf-8') as file:
-		file.write(jsbeautifier.beautify(json.dumps(data), JSON_OPTIONS))
+	with DelayedKeyboardInterrupt():
+		with open(NALA_HISTORY, 'w', encoding='utf-8') as file:
+			file.write(jsbeautifier.beautify(json.dumps(data), JSON_OPTIONS))
 
 def history() -> None:
 	"""History command."""
