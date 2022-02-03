@@ -158,15 +158,11 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 
 	def _set_proxy(self) -> None:
 		"""Set proxy configuration."""
-		http_proxy = apt_pkg.config.find('Acquire::http::Proxy')
-		https_proxy = apt_pkg.config.find('Acquire::https::Proxy', http_proxy)
-		ftp_proxy = apt_pkg.config.find('Acquire::ftp::Proxy')
-
-		if http_proxy:
+		if http_proxy := apt_pkg.config.find('Acquire::http::Proxy'):
 			self.proxy['http://'] = http_proxy
-		if https_proxy:
+		if https_proxy := apt_pkg.config.find('Acquire::https::Proxy', http_proxy):
 			self.proxy['https://'] = https_proxy
-		if ftp_proxy:
+		if ftp_proxy := apt_pkg.config.find('Acquire::ftp::Proxy'):
 			self.proxy['ftp://'] = ftp_proxy
 
 	def _set_pkg_urls(self) -> None:
