@@ -45,7 +45,7 @@ from rich.console import Group
 from rich.panel import Panel
 from rich.progress import TaskID
 
-from nala.constants import DPKG_LOG, DPKG_MSG, ERROR_PREFIX, SPAM
+from nala.constants import DPKG_LOG, DPKG_MSG, ERROR_PREFIX, HANDLER, SPAM
 from nala.options import arguments
 from nala.rich import Live, Spinner, Table, Text, dpkg_progress
 from nala.utils import color, term
@@ -65,7 +65,7 @@ class UpdateProgress(text.AcquireProgress, base.OpProgress): # type: ignore[misc
 		text.AcquireProgress.__init__(self)
 		base.OpProgress.__init__(self)
 		self._file = sys.stdout
-		self._signal = None
+		self._signal: HANDLER = None
 		self._id = 1
 		self._width = 80
 		self.old_op = "" # OpProgress setting
@@ -189,7 +189,7 @@ class UpdateProgress(text.AcquireProgress, base.OpProgress): # type: ignore[misc
 		window resize signals. And it also sets id to 1.
 		"""
 		base.AcquireProgress.start(self)
-		self._signal = signal.signal(signal.SIGWINCH, self._winch) # type: ignore[assignment]
+		self._signal = signal.signal(signal.SIGWINCH, self._winch)
 		# Get the window size.
 		self._winch()
 		self._id = 1
@@ -208,7 +208,7 @@ class UpdateProgress(text.AcquireProgress, base.OpProgress): # type: ignore[misc
 		if self.fetched_bytes != 0:
 			self._write(self.final_msg())
 		# Delete the signal again.
-		signal.signal(signal.SIGWINCH, self._signal) # type: ignore[arg-type]
+		signal.signal(signal.SIGWINCH, self._signal)
 		self.live.stop()
 
 class InstallProgress(base.InstallProgress): # type: ignore[misc] # pylint: disable=too-many-instance-attributes
