@@ -37,8 +37,8 @@ from random import shuffle
 from signal import SIGINT, SIGTERM, Signals
 from typing import Pattern
 
-import aiofiles
 import apt_pkg
+from anyio import open_file
 from apt.package import Package, Version
 from httpx import (URL, AsyncClient, ConnectError, ConnectTimeout, HTTPError,
 				HTTPStatusError, Proxy, RemoteProtocolError, RequestError, get)
@@ -98,7 +98,7 @@ class PkgDownloader: # pylint: disable=too-many-instance-attributes
 		"""Stream the deb package and write it to file."""
 		total_data = 0
 		async with client.stream('GET', url) as response:
-			async with aiofiles.open(dest, mode="wb") as file:
+			async with await open_file(dest, mode="wb") as file:
 				async for data in response.aiter_bytes():
 					if data:
 						await file.write(data)
