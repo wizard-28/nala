@@ -97,9 +97,17 @@ def not_apt_command() -> NoReturn:
 	sys.exit(0)
 
 def arg_check(args: list[str], msg: str) -> None:
-	"""Check arguments and errors if no packages are specified."""
+	"""Check arguments and errors if no packages are specified.
+
+	If args exists then duplicates will be removed.
+	"""
 	if not args:
 		sys.exit(ERROR_PREFIX+f'You must specify a package to {msg}')
+	dedupe = []
+	for arg in arguments.args:
+		if arg not in dedupe:
+			dedupe.append(arg)
+	arguments.args = dedupe
 
 def clean() -> None:
 	"""Find and delete cache files."""
