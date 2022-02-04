@@ -34,7 +34,8 @@ from errno import ENOENT
 from functools import partial
 from pathlib import Path
 from random import shuffle
-from signal import SIGINT, SIGTERM, Signals
+from signal import (SIGINT,  # pylint: disable=no-name-in-module #Codacy
+				SIGTERM, Signals)
 from typing import Pattern
 
 import apt_pkg

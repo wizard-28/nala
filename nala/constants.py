@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from signal import Handlers
+from signal import Handlers  # pylint: disable=no-name-in-module #Codacy
 from types import FrameType
 from typing import Any, Callable, Optional, Union
 
