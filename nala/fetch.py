@@ -36,7 +36,8 @@ from httpx import HTTPError, get
 from pythonping import ping
 from rich.progress import TaskID
 
-from nala.constants import ERRNO_PATTERN, ERROR_PREFIX, NALA_SOURCES
+from nala.constants import (ERRNO_PATTERN, ERROR_PREFIX,
+				NALA_SOURCES, SOURCELIST, SOURCEPARTS)
 from nala.logger import dprint
 from nala.options import arguments, parser
 from nala.rich import Live, Table, fetch_progress
@@ -235,20 +236,38 @@ def detect_release() -> tuple[str, str]:
 		return DEBIAN, arguments.debian
 	return UBUNTU, arguments.ubuntu
 
-def write_sources(release: str, component: str) -> None:
+def parse_sources() -> list[str]:
+	"""Read sources files on disk."""
+	sources: list[str] = []
+	for file in SOURCEPARTS.iterdir():
+		if file != NALA_SOURCES:
+			for line in file.read_text(encoding='utf-8').splitlines():
+				if not line.startswith('#') and line:
+					sources.append(line)
+	if SOURCELIST.exists():
+		for line in SOURCELIST.read_text(encoding='utf-8').splitlines():
+			if not line.startswith('#') and line:
+				sources.append(line)
+	return sources
+
+def write_sources(release: str, component: str, sources: list[str]) -> None:
 	"""Write mirrors to nala-sources.list."""
 	with open(NALA_SOURCES, 'w', encoding="utf-8") as file:
 		print(f"{color('Writing:', 'GREEN')} {NALA_SOURCES}\n")
 		print('# Sources file built for nala\n', file=file)
-		arguments.fetches -= 1
-		for num, line in enumerate(netselect_scored):
+		num = 0
+		for line in netselect_scored:
 			# This splits off the score '030 http://mirror.steadfast.net/debian/'
 			line = line[line.index('h'):]
+			# This protects us from writing mirrors that we already have in the sources
+			if any(line in mirror and release in mirror for mirror in sources):
+				continue
 			source = f'{line} {release} {component}'
 			print(f'deb {source}')
 			print(f'deb-src {source}\n')
 			print(f'deb {source}', file=file)
 			print(f'deb-src {source}\n', file=file)
+			num += 1
 			if num == arguments.fetches:
 				break
 
@@ -314,4 +333,5 @@ def fetch() -> None:
 	dprint(f'Size of original list: {len(netselect)}')
 	dprint(f'Size of scored list: {len(netselect_scored)}')
 	dprint(f'Writing from: {netselect_scored[:arguments.fetches]}')
-	write_sources(release, component)
+	sources = parse_sources()
+	write_sources(release, component, sources)

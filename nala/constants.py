@@ -69,6 +69,10 @@ PKGCACHE = Path(apt_pkg.config.find_dir('Dir::Cache::pkgcache'))
 """/var/cache/apt/pkgcache.bin"""
 SRCPKGCACHE = Path(apt_pkg.config.find_dir('Dir::Cache::srcpkgcache'))
 """/var/cache/apt/srcpkgcache.bin"""
+SOURCELIST = Path(apt_pkg.config.find_file('Dir::Etc::sourcelist'))
+"""/etc/apt/sources.list"""
+SOURCEPARTS = Path(apt_pkg.config.find_dir('Dir::Etc::sourceparts'))
+"""/etc/apt/sources.list.d"""
 
 JSON_OPTIONS = jsbeautifier.BeautifierOptions(options={'indent_with_tabs' : True})
 ERROR_PREFIX = '\x1b[1;31mError: \x1b[0m'
