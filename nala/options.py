@@ -40,6 +40,7 @@ class NalaParser(argparse.ArgumentParser):
 
 	def error(self, message: str) -> NoReturn:
 		"""Send `--help` on error."""
+		message = message.replace(r", 'moo')", ')')
 		sys.stderr.write(f'error: {message}\n')
 		self.print_help()
 		sys.exit(1)
@@ -125,7 +126,7 @@ global_options.add_argument(
 global_options.add_argument(
 	'-v', '--verbose',
 	action='store_true',
-	help='Logs extra information for debugging'
+	help='logs extra information for debugging'
 )
 global_options.add_argument(
 	'--no-update',
@@ -150,7 +151,7 @@ global_options.add_argument(
 global_options.add_argument(
 	'--debug',
 	action='store_true',
-	help='Logs extra information for debugging'
+	help='logs extra information for debugging'
 )
 global_options.add_argument(
 	'--version',
@@ -165,11 +166,11 @@ global_options.add_argument(
 interactive_options = NalaParser(add_help=False)
 interactive_options.add_argument(
 	'--no-aptlist', action='store_true',
-	help="sets 'APT_LISTCHANGES_FRONTEND=none'. apt-listchanges will not bug you"
+	help="sets 'APT_LISTCHANGES_FRONTEND=none', apt-listchanges will not bug you"
 )
 interactive_options.add_argument(
 	'--noninteractive', action='store_true',
-	help="sets 'DEBIAN_FRONTEND=noninteractive'. this also disables apt-listchanges"
+	help="sets 'DEBIAN_FRONTEND=noninteractive', this also disables apt-listchanges"
 )
 interactive_options.add_argument(
 	'--noninteractive-full', action='store_true',
@@ -189,7 +190,7 @@ interactive_options.add_argument(
 )
 interactive_options.add_argument(
 	'--confmiss', action='store_true',
-	help="always install the missing conffile without prompting. this is dangerous"
+	help="always install the missing conffile without prompting. This is dangerous!"
 )
 interactive_options.add_argument(
 	'--confask', action='store_true',
@@ -215,10 +216,13 @@ install_parser = subparsers.add_parser('install',
 	formatter_class=formatter,
 	help='install packages',
 	parents=[global_options, interactive_options],
-	usage=f'{bin_name} install [--options] pkg1 [pkg2 ...]'
+	usage=f'{bin_name} install [--options] [pkg1 pkg2 ...]'
 	)
 
-install_parser.add_argument('args', metavar='pkg(s)', nargs='*', help='package(s) to install')
+install_parser.add_argument('args',
+	metavar='pkg(s)',
+	nargs='*',
+	help='package(s) to install')
 
 remove_options(install_parser, no_update=True)
 
@@ -226,7 +230,7 @@ remove_options(install_parser, no_update=True)
 remove_parser = subparsers.add_parser('remove',
 	formatter_class=formatter,
 	help='remove packages', parents=[global_options, interactive_options],
-	usage=f'{bin_name} remove [--options] pkg1 [pkg2 ...]'
+	usage=f'{bin_name} remove [--options] [pkg1 pkg2 ...]'
 )
 
 # Remove Global options that I don't want to see in remove --help
@@ -241,7 +245,7 @@ remove_parser.add_argument('args',
 purge_parser = subparsers.add_parser('purge',
 	formatter_class=formatter,
 	help='purge packages', parents=[global_options, interactive_options],
-	usage=f'{bin_name} remove [--options] pkg1 [pkg2 ...]'
+	usage=f'{bin_name} purge [--options] [pkg1 pkg2 ...]'
 )
 
 # Remove Global options that I don't want to see in purge --help
@@ -323,8 +327,8 @@ fetch_parser = subparsers.add_parser('fetch',
 	formatter_class=formatter,
 	description=(
 	'nala will fetch mirrors with the lowest latency.\n'
-	'for Debian https://www.debian.org/mirror/list-full\n'
-	'for Ubuntu https://launchpad.net/ubuntu/+archivemirrors'
+	'for Debian https://mirror-master.debian.org/status/Mirrors.masterlist\n'
+	'for Ubuntu https://launchpad.net/ubuntu/+archivemirrors-rss'
 	),
 	help='fetches fast mirrors to speed up downloads',
 	parents=[fetch_options, global_options],
@@ -347,7 +351,7 @@ show_parser = subparsers.add_parser(
 	'show',
 	help='show package details',
 	parents=[show_options, global_options, interactive_options],
-	usage=f'{bin_name} show [--options] pkg1 [pkg2 ...]'
+	usage=f'{bin_name} show [--options] [pkg1 pkg2 ...]'
 )
 # Remove Global options that I don't want to see in show --help
 remove_options(
@@ -383,7 +387,7 @@ history_parser.add_argument(
 	'mode',
 	metavar='info <id>',
 	nargs='?',
-	help='action you would like to do on the history'
+	help='show information about a specific transaction'
 )
 history_parser.add_argument(
 	'id',
