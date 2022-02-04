@@ -187,11 +187,6 @@ def color(text: str, text_color: str = 'WHITE') -> str:
 	"""Return bold text in the color of your choice."""
 	return f'\x1b[1;{COLOR_CODES[text_color]}m' + text + str(COLOR_CODES['RESET'])
 
-def dir_check(path: Path, msg: str) -> None:
-	"""Check to see if the directory exists in apt config."""
-	if not path:
-		sys.exit(ERROR_PREFIX+msg)
-
 def ask(question: str, default_no: bool = False) -> bool:
 	"""Ask the user {question}.
 

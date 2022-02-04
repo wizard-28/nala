@@ -29,13 +29,13 @@ from getpass import getuser
 from typing import NoReturn
 
 from nala.constants import (ARCHIVE_DIR, CAT_ASCII, ERROR_PREFIX,
-				LISTS_DIR, LISTS_PARTIAL_DIR, PARTIAL_DIR, PKGCACHE, SRCPKGCACHE)
+				LISTS_PARTIAL_DIR, PARTIAL_DIR, PKGCACHE, SRCPKGCACHE)
 from nala.fetch import fetch
 from nala.history import history, history_clear, history_info, history_undo
 from nala.logger import dprint, esyslog
 from nala.nala import Nala
 from nala.options import arguments, parser
-from nala.utils import dir_check, iter_remove, term
+from nala.utils import iter_remove, term
 
 if str(ARCHIVE_DIR) == '/':
 	sys.exit(ERROR_PREFIX+"archive dir is '/'. This is dangerous and unsupported.")
@@ -45,12 +45,6 @@ def _main() -> None:
 	if not arguments.command and not arguments.update:
 		parser.print_help()
 		sys.exit(1)
-
-	# Make sure these are set, they probably are, but we will error early if not
-	dir_check(ARCHIVE_DIR, 'No archive dir is set. Usually it is /var/cache/apt/archives/')
-	dir_check(LISTS_DIR, 'No lists dir is set. Usually it is /var/lib/apt/lists/')
-	dir_check(PKGCACHE, 'No pkgcache file is set. Usually it is /var/cache/apt/pkgcache.bin')
-	dir_check(SRCPKGCACHE, 'No srcpkgcache file is set. Usually it is /var/cache/apt/srcpkgcache.bin')
 
 	dprint(f"Argparser = {arguments}")
 	superuser= ('update', 'upgrade', 'install', 'remove', 'fetch', 'clean')
