@@ -56,6 +56,9 @@ to add quality of life changes, and improve the output to make it more reader fr
 **-d, \--download-only**
 : *\--download-only* will do just that, download packages only. It will not unpack or configure anything.
 
+**-a, \--all-versions**
+: *\--all-versions*, used with the **show** command, will print information about each version that is currently in the cache.
+
 **\--no-update**
 : *\--no-update* skips updating the package cache if for whatever reason you would like to skip that.
 
