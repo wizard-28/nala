@@ -45,6 +45,7 @@ def show(num: int, pkg: Package) -> int:
 	"""Orchestrate show command with support for all_versions."""
 	if num:
 		print_sep()
+	count = len(pkg.versions)
 	versions = pkg.versions if arguments.all_versions else [pkg.candidate]
 	for ver_num, ver in enumerate(versions):
 		if ver is None:
@@ -52,9 +53,9 @@ def show(num: int, pkg: Package) -> int:
 			continue
 		if ver_num and not num:
 			print_sep()
+		count -= 1
 		show_main(ver)
-	# Minus one so we don't say there are one additional packages for only 1 package
-	return len(pkg.versions) - 1
+	return count
 
 def show_main(candidate: Version) -> None:
 	"""Start show functions."""
