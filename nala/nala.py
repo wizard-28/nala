@@ -229,7 +229,6 @@ class Nala:
 		autoremove_names: list[list[str]] = []
 
 		for pkg in pkgs:
-			candidate = pkg_candidate(pkg)
 			if pkg.marked_delete:
 				installed = pkg_installed(pkg)
 				if pkg.name not in self.autoremoved:
@@ -240,8 +239,10 @@ class Nala:
 					autoremove_names.append(
 						[pkg.name, installed.version, str(installed.size)]
 					)
+				continue
 
-			elif pkg.marked_install:
+			candidate = pkg_candidate(pkg)
+			if pkg.marked_install:
 				install_names.append(
 					[pkg.name, candidate.version, str(candidate.size)]
 				)
