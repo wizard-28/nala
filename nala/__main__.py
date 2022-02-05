@@ -71,6 +71,7 @@ def apt_command() -> NoReturn:
 	elif arguments.command in ('remove', 'purge'):
 		purge = arguments.command == 'purge'
 		args = arguments.args
+		arg_check(arguments.args, arguments.command)
 		apt.remove(args, purge=purge)
 
 	elif arguments.command == 'show':
