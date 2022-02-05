@@ -79,7 +79,7 @@ class GPLv3(argparse.Action):
 			print('https://www.gnu.org/licenses/gpl-3.0.txt')
 		parser.exit()
 
-def remove_options(argparser: NalaParser, **kwargs: bool) -> None:
+def remove_help_options(argparser: NalaParser, **kwargs: bool) -> None:
 	"""Remove options that we do not want in our help message.
 
 	If an argument is True it will remove the option.
@@ -224,7 +224,7 @@ install_parser.add_argument('args',
 	nargs='*',
 	help='package(s) to install')
 
-remove_options(install_parser, no_update=True)
+remove_help_options(install_parser, no_update=True)
 
 # Parser for the remove command
 remove_parser = subparsers.add_parser('remove',
@@ -234,7 +234,7 @@ remove_parser = subparsers.add_parser('remove',
 )
 
 # Remove Global options that I don't want to see in remove --help
-remove_options(remove_parser, download_only=True, no_update=True)
+remove_help_options(remove_parser, download_only=True, no_update=True)
 
 remove_parser.add_argument('args',
 	metavar='pkg(s)',
@@ -249,7 +249,7 @@ purge_parser = subparsers.add_parser('purge',
 )
 
 # Remove Global options that I don't want to see in purge --help
-remove_options(purge_parser, download_only=True, no_update=True)
+remove_help_options(purge_parser, download_only=True, no_update=True)
 
 purge_parser.add_argument(
 	'args',
@@ -277,7 +277,7 @@ update_parser = subparsers.add_parser(
 	usage=f'{bin_name} update [--options]'
 )
 
-remove_options(
+remove_help_options(
 	update_parser, update=True,
 )
 
@@ -289,7 +289,7 @@ upgrade_parser = subparsers.add_parser(
 	usage=f'{bin_name} upgrade [--options]'
 )
 
-remove_options(
+remove_help_options(
 	upgrade_parser, update=True,
 )
 
@@ -335,7 +335,7 @@ fetch_parser = subparsers.add_parser('fetch',
 	usage=f'{bin_name} fetch [--options]'
 )
 # Remove Global options that I don't want to see in fetch --help
-remove_options(fetch_parser)
+remove_help_options(fetch_parser)
 remove_interactive_options(fetch_parser)
 
 # We do the same thing that we did with update options
@@ -354,7 +354,7 @@ show_parser = subparsers.add_parser(
 	usage=f'{bin_name} show [--options] [pkg1 pkg2 ...]'
 )
 # Remove Global options that I don't want to see in show --help
-remove_options(
+remove_help_options(
 	show_parser, assume_yes=True,
 	download_only=True, no_update=True,
 	raw_dpkg=True, noninteractive=True,
@@ -374,7 +374,7 @@ history_parser = subparsers.add_parser(
 	usage=f'{bin_name} history [--options] <command> <id|all>'
 )
 # Remove Global options that I don't want to see in history --help
-remove_options(
+remove_help_options(
 	history_parser, assume_yes=True,
 	download_only=True, no_update=True,
 	raw_dpkg=True, noninteractive=True,
@@ -417,7 +417,7 @@ clean_parser = subparsers.add_parser(
 )
 
 # Remove Global options that I don't want to see in clean --help
-remove_options(clean_parser)
+remove_help_options(clean_parser)
 
 # This is just moo, but we can't cause are cat
 moo_parser = subparsers.add_parser(
