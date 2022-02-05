@@ -293,47 +293,45 @@ remove_help_options(
 	upgrade_parser, update=True,
 )
 
-# We do the same thing that we did with update options
-fetch_options = NalaParser(add_help=False)
-fetch_options.add_argument(
+# Parser for the fetch command
+fetch_parser = subparsers.add_parser('fetch',
+	formatter_class=formatter,
+	description=(
+	'Nala will fetch mirrors with the lowest latency.\n'
+	'For Debian https://mirror-master.debian.org/status/Mirrors.masterlist\n'
+	'For Ubuntu https://launchpad.net/ubuntu/+archivemirrors-rss'
+	),
+	help='fetches fast mirrors to speed up downloads',
+	parents=[global_options],
+	usage=f'{bin_name} fetch [--options]'
+)
+fetch_parser.add_argument(
 	'--fetches',
 	metavar='number',
 	type=int, default=3,
 	help="number of mirrors to fetch"
 )
-fetch_options.add_argument(
+fetch_parser.add_argument(
 	'--debian',
 	metavar='sid',
 	help="choose the Debian release"
 )
-fetch_options.add_argument(
+fetch_parser.add_argument(
 	'--ubuntu',
 	metavar='jammy',
 	help="choose an Ubuntu release"
 )
-fetch_options.add_argument(
+fetch_parser.add_argument(
 	'--country',
 	metavar='US',
 	help="choose only mirrors of a specific ISO country code"
 )
-fetch_options.add_argument(
+fetch_parser.add_argument(
 	'--foss',
 	action='store_true',
 	help="omits contrib and non-free repos"
 )
 
-# Parser for the fetch command
-fetch_parser = subparsers.add_parser('fetch',
-	formatter_class=formatter,
-	description=(
-	'nala will fetch mirrors with the lowest latency.\n'
-	'for Debian https://mirror-master.debian.org/status/Mirrors.masterlist\n'
-	'for Ubuntu https://launchpad.net/ubuntu/+archivemirrors-rss'
-	),
-	help='fetches fast mirrors to speed up downloads',
-	parents=[fetch_options, global_options],
-	usage=f'{bin_name} fetch [--options]'
-)
 # Remove Global options that I don't want to see in fetch --help
 remove_help_options(fetch_parser)
 remove_interactive_options(fetch_parser)
