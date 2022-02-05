@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from random import shuffle
+from typing import cast
 
 from apt.cache import Cache
 from apt.package import BaseDependency, Dependency, Package, Version
@@ -183,10 +184,10 @@ def print_dep(prefix: str,
 	"""Print dependencies for show."""
 	if isinstance(package_dependecy[0], str):
 		package_dependecy.sort()
-		package_dependecy = [str(dep) for dep in package_dependecy]
-		print(prefix, ", ".join(package_dependecy))
+		print(prefix, ", ".join(cast(list[str], package_dependecy)))
 		return
 
+	package_dependecy = dedupe_deps(cast(list[Dependency], package_dependecy))
 	join_list = []
 	same_line = True
 	if len(package_dependecy) > 4:
@@ -276,6 +277,16 @@ def split_deps(depend_list: list[Dependency]) -> tuple[list[Dependency], list[De
 			continue
 		depends.append(depend)
 	return depends, pre_depends
+
+def dedupe_deps(duplicates: list[Dependency]) -> list[Dependency]:
+	"""Remove duplicate entries from a list while maintaining the order."""
+	deduped = []
+	dep_names = []
+	for dep in duplicates:
+		if dep.rawstr not in dep_names:
+			dep_names.append(dep.rawstr)
+			deduped.append(dep)
+	return deduped
 
 def additional_notice(additional_records: int) -> None:
 	"""Print notice of additional records."""
