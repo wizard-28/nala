@@ -42,7 +42,7 @@ from nala.constants import ARCHIVE_DIR, ERROR_PREFIX, NALA_DIR, PARTIAL_DIR
 from nala.downloader import PkgDownloader
 from nala.dpkg import InstallProgress, UpdateProgress
 from nala.history import write_history, write_log
-from nala.install import check_broken, install_main, print_broken
+from nala.install import broken_error, check_broken, package_manager
 from nala.options import arguments
 from nala.rich import Table
 from nala.show import additional_notice, check_virtual, show
@@ -89,16 +89,8 @@ class Nala:
 		if not_found:
 			pkg_error(not_found, 'not found', terminate=True)
 
-		if not install_main(pkg_names, self.cache):
-			for pkg in broken:
-				if pkg.candidate is None:
-					for version in pkg.versions:
-						print_broken(pkg.name, version)
-				else:
-					print_broken(pkg.name, pkg.candidate)
-
-			print(f"\n{color('Notice:', 'YELLOW')} The information above may be able to help")
-			sys.exit(ERROR_PREFIX + 'You have held broken packages')
+		if not package_manager(pkg_names, self.cache):
+			broken_error(broken)
 
 		self.auto_remover()
 		self.get_changes()
@@ -107,24 +99,26 @@ class Nala:
 		"""Remove or Purge pkg[s]."""
 		dprint(f"Remove pkg_names: {pkg_names}")
 		not_found: list[str] = []
-		not_installed: list[str] = []
 		self.purge = purge
 
 		pkg_names = glob_filter(pkg_names, self.cache.keys())
+		broken, not_found = check_broken(
+			pkg_names, self.cache, remove=True, purge=purge
+		)
 
-		for pkg_name in pkg_names:
-			if check_found(self.cache, pkg_name, not_found, not_installed):
-
-				pkg = self.cache[pkg_name]
-				pkg.mark_delete(purge=self.purge)
-				# Add name to deleted for autoremove checking.
-				self.deleted.append(pkg.name)
-		dprint(f"Marked delete: {self.deleted}")
-
-		if not_installed:
-			pkg_error(not_installed, 'not installed')
 		if not_found:
 			pkg_error(not_found, 'not found')
+
+		if not package_manager(
+			pkg_names, self.cache,
+			remove=True, deleted=self.deleted, purge=purge):
+
+			broken_error(
+				broken,
+				tuple(pkg for pkg in self.cache if pkg.is_installed and pkg_installed(pkg).dependencies)
+			)
+
+		dprint(f"Marked delete: {self.deleted}")
 
 		self.auto_remover()
 		self.get_changes(remove=True)
@@ -329,22 +323,6 @@ def check_work(pkgs: list[Package], upgrade: bool, remove: bool) -> None:
 	elif remove and not pkgs:
 		print(color("Nothing for Nala to remove."))
 		sys.exit(0)
-
-def check_found(cache: Cache, pkg_name: str,
-	not_found: list[str], not_installed: list[str]) -> bool:
-	"""Check if package is in the cache or installed.
-
-	Return True if the package is found.
-	"""
-	if pkg_name not in cache:
-		not_found.append(pkg_name)
-		return False
-
-	pkg = cache[pkg_name]
-	if not pkg.installed:
-		not_installed.append(pkg_name)
-		return False
-	return True
 
 def check_essential(pkgs: list[Package]) -> None:
 	"""Check removal of essential packages."""
