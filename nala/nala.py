@@ -44,7 +44,7 @@ from nala.dpkg import InstallProgress, UpdateProgress
 from nala.history import write_history, write_log
 from nala.install import broken_error, check_broken, package_manager
 from nala.options import arguments
-from nala.rich import Table
+from nala.rich import Columns, Table, Text, console
 from nala.show import additional_notice, check_virtual, show
 from nala.utils import (ask, check_pkg, color, dprint, get_pkg_name,
 				pkg_candidate, pkg_installed, print_packages, term, unit_str)
@@ -326,43 +326,48 @@ def check_work(pkgs: list[Package], upgrade: bool, remove: bool) -> None:
 
 def check_essential(pkgs: list[Package]) -> None:
 	"""Check removal of essential packages."""
-	essential: list[str] = []
-	nala_check: bool = False
-	banter: str = 'apt'
+	if arguments.remove_essential:
+		return
+	essential: list[Text] = []
 	for pkg in pkgs:
 		if pkg.is_installed:
 			# do not allow the removal of essential or required packages
 			if pkg_installed(pkg).priority == 'required' and pkg.marked_delete:
-				essential.append(pkg.name)
+				essential.append(
+					Text.from_ansi(color(pkg.name, 'RED'))
+				)
 			# do not allow the removal of nala
 			elif pkg.shortname in 'nala' and pkg.marked_delete:
-				nala_check = True
-				banter = 'auto_preservation'
-				essential.append('nala')
+				essential.append(
+					Text.from_ansi(color('nala', 'RED'))
+				)
 
-	if essential or nala_check:
-		pkg_error(essential, 'cannot be removed', banter=banter, terminate=True)
+	if essential:
+		essential_error(essential)
 
-def pkg_error(pkg_list: list[str], msg: str, banter: str = '', terminate: bool = False) -> None:
-	"""Print error for package in list.
+def essential_error(pkg_list: list[Text]) -> NoReturn:
+	"""Print error message for essential packages and exit."""
+	the_following = color('The Following Packages are')
+	essential_package = f"You have attempted to remove {color('essential packages', 'RED')}"
+	if len(pkg_list) == 1:
+		the_following = color('The Following Package is')
+		essential_package = f"You have attempted to remove an {color('essential package', 'RED')}"
+	print('='*term.columns)
+	print(the_following, color('Essential!', 'RED'))
+	print('='*term.columns)
+	console.print(Columns(pkg_list, padding=(0,2), equal=True))
 
-	banter is optional and can be one of::
+	print('='*term.columns)
+	switch = color('--remove-essential', 'YELLOW')
+	print(ERROR_PREFIX+essential_package)
+	print(ERROR_PREFIX+f"Please use {switch} if you are sure you want too.")
+	sys.exit(1)
 
-		apt: "Maybe apt will let you"
-		auto_essential: "Whatever you did tried to auto mark essential packages"
-		auto_preservation: "Whatever you did would have resulted in my own removal!"
-	"""
+def pkg_error(pkg_list: list[str], msg: str = '', terminate: bool = False) -> None:
+	"""Print error for package in list."""
 	for pkg in pkg_list:
 		print(ERROR_PREFIX+color(pkg, 'YELLOW'), msg)
-	if banter:
-		if banter == 'apt':
-			print(f"Maybe {color('apt', 'RED')} will let you")
 
-		elif banter == 'auto_essential':
-			print("Whatever you did tried to auto mark essential packages")
-
-		elif banter == 'auto_preservation':
-			print("This would have resulted in my own removal!")
 	if terminate:
 		sys.exit(1)
 

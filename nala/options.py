@@ -90,7 +90,7 @@ def remove_help_options(argparser: NalaParser, **kwargs: bool) -> None:
 		'assume_yes' : True, 'download_only' : True,
 		'update' : True, 'no_update' : True,
 		'raw_dpkg' : True, 'noninteractive' : True,
-		'no_autoremove' : True
+		'no_autoremove' : True, 'remove_essential' : True
 		}
 
 	action_group = argparser._optionals._group_actions
@@ -137,6 +137,11 @@ global_options.add_argument(
 	'--no-autoremove',
 	action='store_true',
 	help='stops nala from autoremoving packages'
+)
+global_options.add_argument(
+	'--remove-essential',
+	action='store_true',
+	help="allows the removal of essential packages"
 )
 global_options.add_argument(
 	'--raw-dpkg',
