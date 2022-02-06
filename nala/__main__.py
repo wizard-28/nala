@@ -133,7 +133,6 @@ def nala_history(apt: Nala) -> None:
 		sys.exit(ERROR_PREFIX+f"'{mode}' isn't a valid history command")
 	if mode and not arguments.id:
 		sys.exit(ERROR_PREFIX+'We need a transaction ID..')
-
 	if mode in ('undo', 'redo', 'info'):
 		try:
 			# We are basically just type checking here
@@ -143,9 +142,11 @@ def nala_history(apt: Nala) -> None:
 	if not mode:
 		history()
 	if mode == 'undo':
+		sudo_check('undo history')
 		history_undo(apt, arguments.id)
 
 	elif mode == 'redo':
+		sudo_check('redo history')
 		history_undo(apt, arguments.id, redo=True)
 
 	elif mode == 'info':
