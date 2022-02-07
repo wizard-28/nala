@@ -132,13 +132,13 @@ def nala_history(apt: Nala) -> None:
 	if mode and mode not in ('undo', 'redo', 'info', 'clear'):
 		sys.exit(ERROR_PREFIX+f"'{mode}' isn't a valid history command")
 	if mode and not arguments.id:
-		sys.exit(ERROR_PREFIX+'We need a transaction ID..')
+		sys.exit(ERROR_PREFIX+'We need a transaction ID...')
 	if mode in ('undo', 'redo', 'info'):
 		try:
 			# We are basically just type checking here
 			int(arguments.id)
 		except ValueError:
-			sys.exit(ERROR_PREFIX+'Option must be a number..')
+			sys.exit(ERROR_PREFIX+'Option must be a number...')
 	if not mode:
 		history()
 	if mode == 'undo':

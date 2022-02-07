@@ -70,7 +70,7 @@ def write_history_file(data: dict[str, dict[str, str | list[str] | list[list[str
 def history() -> None:
 	"""History command."""
 	if not NALA_HISTORY.exists():
-		print("No history exists..")
+		print("No history exists...")
 		return
 	history_file = load_history_file()
 	names: list[tuple[str, str, str, str]] = []
@@ -140,7 +140,7 @@ def history_clear(hist_id: str) -> None:
 	"""Show command."""
 	dprint(f"History clear {hist_id}")
 	if not NALA_HISTORY.exists():
-		print("No history exists to clear..")
+		print("No history exists to clear...")
 		return
 
 	if hist_id == 'all':
@@ -237,7 +237,7 @@ def get_history(hist_id: str) -> dict[str, str | list[str] | list[list[str]]]:
 	"""Get the history from file."""
 	dprint(f"Getting history {hist_id}")
 	if not NALA_HISTORY.exists():
-		sys.exit("No history exists..")
+		sys.exit("No history exists...")
 	history_file: dict[str, dict[str, str | list[str] | list[list[str]]]] = (
 		json.loads(NALA_HISTORY.read_text(encoding='utf-8'))
 	)
