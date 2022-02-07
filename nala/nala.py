@@ -36,18 +36,22 @@ from typing import NoReturn
 
 import apt_pkg
 from apt.cache import Cache, FetchFailedException, LockFailedException
+from apt.debfile import DebPackage
 from apt.package import Package
 
-from nala.constants import ARCHIVE_DIR, ERROR_PREFIX, NALA_DIR, PARTIAL_DIR
+from nala.constants import (ARCHIVE_DIR, DPKG_LOG,
+				ERROR_PREFIX, NALA_DIR, PARTIAL_DIR, ExitCode)
 from nala.downloader import PkgDownloader
-from nala.dpkg import InstallProgress, UpdateProgress
+from nala.dpkg import InstallProgress, OpProgress, UpdateProgress, notice
 from nala.history import write_history, write_log
-from nala.install import broken_error, check_broken, package_manager
+from nala.install import (broken_error, check_broken,
+				install_local, package_manager, split_local)
 from nala.options import arguments
-from nala.rich import Columns, Table, Text, console
+from nala.rich import Columns, Live, Table, Text, console, dpkg_progress
 from nala.show import additional_notice, check_virtual, show
-from nala.utils import (ask, check_pkg, color, dprint, get_pkg_name,
-				pkg_candidate, pkg_installed, print_packages, term, unit_str)
+from nala.utils import (DelayedKeyboardInterrupt, ask,
+				check_pkg, color, dprint, get_pkg_name, pkg_candidate,
+				pkg_installed, print_packages, term, unit_str)
 
 
 class Nala:
@@ -58,20 +62,12 @@ class Nala:
 		self.purge = False
 		self.deleted: list[str] = []
 		self.autoremoved: list[str] = []
+		self.local_debs: list[DebPackage] = []
 		# If raw_dpkg is enabled likely they want to see the update too.
 		# Turn off Rich scrolling if we don't have XTERM.
 		if arguments.raw_dpkg or not term.is_xterm():
 			arguments.verbose = True
-		# We want to update the cache before we initialize it
-		try:
-			if not no_update:
-				Cache().update(UpdateProgress())
-			self.cache = Cache(UpdateProgress())
-		except (LockFailedException, FetchFailedException) as err:
-			apt_error(err)
-		finally:
-			term.restore_mode()
-			term.write(term.SHOW_CURSOR+term.CLEAR_LINE)
+		self.cache = setup_cache(no_update)
 
 	def upgrade(self, dist_upgrade: bool = False) -> None:
 		"""Upgrade pkg[s]."""
@@ -82,9 +78,13 @@ class Nala:
 	def install(self, pkg_names: list[str]) -> None:
 		"""Install pkg[s]."""
 		dprint(f"Install pkg_names: {pkg_names}")
+		self.local_debs, pkg_names, not_exist = split_local(pkg_names, self.cache)
+		local_names = install_local(self.local_debs) if self.local_debs else []
+
 		pkg_names = glob_filter(pkg_names, self.cache.keys())
 
 		broken, not_found = check_broken(pkg_names, self.cache)
+		not_found.extend(not_exist)
 
 		if not_found:
 			pkg_error(not_found, 'not found', terminate=True)
@@ -93,7 +93,7 @@ class Nala:
 			broken_error(broken)
 
 		self.auto_remover()
-		self.get_changes()
+		self.get_changes(local_names=local_names)
 
 	def remove(self, pkg_names: list[str], purge: bool = False) -> None:
 		"""Remove or Purge pkg[s]."""
@@ -157,7 +157,8 @@ class Nala:
 
 			dprint(f"Pkgs marked by autoremove: {self.autoremoved}")
 
-	def get_changes(self, upgrade: bool = False, remove: bool = False) -> None:
+	def get_changes(self,
+		upgrade: bool = False, remove: bool = False, local_names: list[list[str]] | None = None) -> None:
 		"""Get packages requiring changes and process them."""
 		pkgs = sorted(self.cache.get_changes(), key=sort_pkg_name)
 		if not NALA_DIR.exists():
@@ -168,6 +169,8 @@ class Nala:
 		if pkgs:
 			check_essential(pkgs)
 			delete_names, install_names, upgrade_names, autoremove_names = self.sort_pkg_changes(pkgs)
+			if local_names:
+				install_names.extend(local_names)
 			self.print_update_summary(delete_names, install_names, upgrade_names, autoremove_names)
 
 			check_term_ask()
@@ -194,25 +197,44 @@ class Nala:
 		"""Set environment and start dpkg."""
 		set_env()
 		try:
-			self.cache.commit(
-				UpdateProgress(install=True),
-				InstallProgress(pkg_total)
-			)
-
-		except apt_pkg.Error as error:
-			sys.exit(f'\r\n{ERROR_PREFIX+str(error)}')
-
+			self.commit_pkgs(pkg_total)
+		# Catch system error because if dpkg fails it'll throw this
+		except (apt_pkg.Error, SystemError) as error:
+			sys.exit(f'\r\n{ERROR_PREFIX + str(error)}')
 		except FetchFailedException as error:
-			# Apt sends us one big long string of errors separated by '\n'
 			for failed in str(error).splitlines():
-				print(ERROR_PREFIX+failed)
+				print(ERROR_PREFIX + failed)
 			sys.exit(1)
-
+		except KeyboardInterrupt:
+			print("Exiting due to SIGINT")
+			sys.exit(ExitCode.SIGINT)
 		finally:
 			term.restore_mode()
 			# If dpkg quits for any reason we lose the cursor
 			term.write(term.SHOW_CURSOR+term.CLEAR_LINE)
+			if notice:
+				print('\n'+color('Notices:', 'YELLOW'))
+				for notice_msg in notice:
+					print(notice_msg)
 		print(color("Finished Successfully", 'GREEN'))
+
+	def commit_pkgs(self, pkg_total: int) -> None:
+		"""Commit the package changes to the cache."""
+		if self.local_debs:
+			# Add one because we start a new instance of InstallProgress
+			pkg_total += 1
+
+		task = dpkg_progress.add_task('', total=pkg_total + 1)
+		with Live(auto_refresh=False) as live:
+			with open(DPKG_LOG, 'w', encoding="utf-8") as dpkg_log:
+				if arguments.raw_dpkg:
+					live.stop()
+				self.cache.commit(
+					UpdateProgress(live, install=True),
+					InstallProgress(dpkg_log, live, task)
+				)
+				for deb in self.local_debs:
+					deb.install(InstallProgress(dpkg_log, live, task))
 
 	def sort_pkg_changes(self, pkgs: list[Package]
 		) -> tuple[list[list[str]], list[list[str]], list[list[str]], list[list[str]]]:
@@ -290,6 +312,23 @@ class Nala:
 			print(f'Disk space required: {unit_str(self.cache.required_space)}')
 		if arguments.download_only:
 			print("Nala will only download the packages")
+
+def setup_cache(no_update: bool) -> Cache:
+	"""Update the cache if necessary, and then return the Cache."""
+	try:
+		if not no_update:
+			with DelayedKeyboardInterrupt():
+				with Live(auto_refresh=False) as live:
+					Cache().update(UpdateProgress(live))
+	except (LockFailedException, FetchFailedException) as err:
+		apt_error(err)
+	except KeyboardInterrupt:
+		print('Exiting due to SIGINT')
+		sys.exit(ExitCode.SIGINT)
+	finally:
+		term.restore_mode()
+		term.write(term.SHOW_CURSOR+term.CLEAR_LINE)
+	return Cache(OpProgress())
 
 def sort_pkg_name(pkg: Package) -> str:
 	"""Sort by package name.

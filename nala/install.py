@@ -25,9 +25,11 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from typing import NoReturn, cast
 
 from apt import Cache, Package, Version
+from apt.debfile import DebPackage
 from apt_pkg import DepCache, Error as AptError
 
 from nala.constants import ERROR_PREFIX
@@ -50,6 +52,83 @@ def remove_pkg(pkg: Package, deleted: list[str], purge: bool = False) -> None:
 		pkg.mark_delete(purge=purge)
 		dprint(f"Marked Remove: {pkg.name}")
 		deleted.append(pkg.name)
+
+def local_missing_dep(pkg: DebPackage) -> None:
+	"""Print missing depends for .deb that can't be satisfied."""
+	cache = Cache(memonly=True)
+	print(color(cast(str, pkg.filename), 'YELLOW'), "can not be installed")
+	print(color('Missing Depends:', 'YELLOW'))
+	for or_group in pkg.depends:
+		for depend in or_group:
+			name, ver, operand = depend
+			if name not in cache:
+				print(f"  {color (name, 'GREEN')} {color(operand)} {color(ver, 'BLUE')}")
+
+def install_local(local_debs: list[DebPackage]) -> list[list[str]]:
+	"""Mark the depends for local debs to be installed.
+
+	Dependencies that are marked will be marked auto installed.
+
+	Returns local_names to be printed in the transaction summary.
+	"""
+	local_names: list[list[str]] = []
+	failed = False
+	for pkg in local_debs:
+		if not check_local_version(pkg):
+			continue
+		if not pkg.check():
+			failed = True
+			local_missing_dep(pkg)
+			continue
+
+		local_names.append(
+			[pkg.pkgname, pkg._sections["Version"], pkg._sections["Installed-Size"]]
+		)
+	if failed:
+		sys.exit(1)
+	return local_names
+
+def check_local_version(pkg: DebPackage) -> bool:
+	"""Check if the version installed is better than the .deb."""
+	if pkg_compare := pkg.compare_to_version_in_cache() == pkg.VERSION_SAME:
+		print(
+			f"Package {color(pkg.pkgname, 'GREEN')}",
+			'is already at the latest version',
+			color(pkg._sections["Version"], 'BLUE')
+		)
+		return False
+
+	if pkg_compare == pkg.VERSION_NEWER:
+		deb_ver = (
+			color('(') + color(pkg._sections['Version'], 'BLUE') + color(')')
+		)
+		install_ver = (
+			color('(') + pkg_installed(pkg._cache[pkg.pkgname]).version + color(')')
+		)
+		print(
+			f"Package {color(pkg.pkgname, 'GREEN')}",
+			f"is older {deb_ver} than the version installed {install_ver}"
+		)
+		return False
+	return True
+
+def split_local(
+	pkg_names: list[str], cache: Cache) -> tuple[list[DebPackage], list[str], list[str]]:
+	"""Split pkg_names into either Local debs, regular install or they don't exist."""
+	local_debs: list[DebPackage] = []
+	cache_debs: list[str] = []
+	not_exist: list[str] = []
+	for name in pkg_names:
+		if '.deb' in name:
+			if not Path(name).exists():
+				not_exist.append(name)
+				continue
+			local_debs.append(
+				DebPackage(name, cache)
+			)
+			continue
+		cache_debs.append(name)
+	return local_debs, cache_debs, not_exist
 
 def package_manager(pkg_names: list[str], cache: Cache,
 	deleted: list[str] | None = None, remove: bool = False, purge: bool = False) -> bool:
