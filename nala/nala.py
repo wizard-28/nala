@@ -342,7 +342,9 @@ def check_term_ask() -> None:
 	# If we're piped or something the user should specify --assume-yes
 	# As They are aware it can be dangerous to continue
 	if not term.is_term() and not arguments.assume_yes:
-		sys.exit(ERROR_PREFIX+"It can be dangerous to continue without a terminal. Use `--assume-yes`")
+		sys.exit(
+		    f'{ERROR_PREFIX}It can be dangerous to continue without a terminal. Use `--assume-yes`'
+		)
 
 	if not arguments.assume_yes and not ask('Do you want to continue'):
 		print("Abort.")
@@ -399,7 +401,7 @@ def essential_error(pkg_list: list[Text]) -> NoReturn:
 	print('='*term.columns)
 	switch = color('--remove-essential', 'YELLOW')
 	print(ERROR_PREFIX+essential_package)
-	print(ERROR_PREFIX+f"Please use {switch} if you are sure you want too.")
+	print(f'{ERROR_PREFIX}Please use {switch} if you are sure you want too.')
 	sys.exit(1)
 
 def pkg_error(pkg_list: list[str], msg: str = '', terminate: bool = False) -> None:
@@ -422,7 +424,7 @@ def process_downloads(pkgs: list[Package]) -> bool:
 			source.rename(destination)
 		except OSError as err:
 			if err.errno != errno.ENOENT:
-				print(ERROR_PREFIX+f"Failed to move archive file {err}")
+				print(f'{ERROR_PREFIX}Failed to move archive file {err}')
 			link_success = False
 	return link_success
 
@@ -485,7 +487,7 @@ def download(pkgs: list[Package]) -> None:
 		if downloader.failed:
 			for pkg in downloader.failed:
 				print(ERROR_PREFIX+f"{pkg} Failed to download")
-			sys.exit(ERROR_PREFIX+'Some downloads failed and in download only mode.')
+			sys.exit(f'{ERROR_PREFIX}Some downloads failed and in download only mode.')
 
 		print("Download complete and in download only mode.")
 		sys.exit(0)
@@ -511,7 +513,9 @@ def glob_filter(pkg_names: list[str], cache_keys: list[str]) -> list[str]:
 			glob = fnmatch.filter(cache_keys, pkg_name)
 			if not glob:
 				glob_failed = True
-				print(ERROR_PREFIX+f"unable to find any packages by globbing {color(pkg_name, 'YELLOW')}")
+				print(
+				    f'{ERROR_PREFIX}unable to find any packages by globbing {color(pkg_name, "YELLOW")}'
+				)
 				continue
 			new_packages.extend(
 				fnmatch.filter(cache_keys, pkg_name)
@@ -531,9 +535,8 @@ def apt_error(apt_err: FetchFailedException | LockFailedException) -> NoReturn:
 		# Sometimes python apt gives us literally nothing to work with.
 		# Probably an issue with sources.list. Needs further testing.
 		sys.exit(
-			ERROR_PREFIX+f"python-apt gave us '{repr(apt_err)}'\n"
-			"This isn't a proper error as it's empty"
-			)
+		    f"{ERROR_PREFIX}python-apt gave us '{repr(apt_err)}'\nThis isn't a proper error as it's empty"
+		)
 	if '.,' in msg:
 		err_list = set(msg.split(','))
 		for err in err_list:
